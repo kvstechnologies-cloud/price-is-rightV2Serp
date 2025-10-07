@@ -1,0 +1,99 @@
+version: 1.0
+runtime: nodejs18
+build:
+  commands:
+    build:
+      - echo "Installing all dependencies..."
+      - npm install
+      - echo "Creating uploads directory..."
+      - mkdir -p server/uploads
+      - echo "Verifying server startup..."
+      - node -e "console.log('Node.js version:', process.version); console.log('Current directory:', process.cwd()); console.log('Files in current directory:', require('fs').readdirSync('.'));"
+      - echo "Build completed successfully"
+run:
+  command: node server/index.js
+  network:
+    port: 5000
+  env:
+    - name: NODE_ENV
+      value: production
+    - name: PORT
+      value: "5000"
+    - name: SERPAPI_KEY
+      value: ${SERPAPI_KEY}
+    - name: OPENAI_API_KEY
+      value: ${OPENAI_API_KEY}
+    - name: GOOGLE_API_KEY
+      value: ${GOOGLE_API_KEY}
+    - name: GOOGLE_SEARCH_ENGINE_ID
+      value: ${GOOGLE_SEARCH_ENGINE_ID}
+    - name: SCRAPER_API_KEY
+      value: ${SCRAPER_API_KEY}
+    - name: MAX_REQUESTS_PER_MINUTE
+      value: "60"
+    - name: CACHE_TTL_SECONDS
+      value: "3600"
+    # ========================================
+    # AUDIT SYSTEM CONFIGURATION
+    # ========================================
+    - name: AUDIT_ENABLED
+      value: "true"
+    # ========================================
+    # DATABASE CONFIGURATION (Aurora MySQL)
+    # ========================================
+    - name: DB_HOST
+      value: price-is-right.cluster-c4568s4csoxh.us-east-1.rds.amazonaws.com
+    - name: DB_PORT
+      value: "3306"
+    - name: DB_USER
+      value: admin
+    - name: DB_PASSWORD
+      value: 1234Inf56
+    - name: DB_NAME
+      value: price_is_right_admin
+    - name: DB_POOL_MIN
+      value: "0"
+    - name: DB_POOL_MAX
+      value: "3"
+    # ========================================
+    # S3 CONFIGURATION
+    # ========================================
+    - name: S3_BUCKET
+      value: pricinginsurance-audit-dev-2025
+    - name: STAGE
+      value: dev
+    - name: AWS_REGION
+      value: us-east-1
+    - name: S3_REGION
+      value: us-east-1
+    - name: S3_PREFIX_EXCEL
+      value: excel/
+    - name: S3_PREFIX_IMAGES
+      value: images/
+    - name: S3_UPLOAD_ENABLED
+      value: "true"
+    # ========================================
+    # AWS CREDENTIALS (for S3 uploads)
+    # ========================================
+    - name: AWS_ACCESS_KEY_ID
+      value: ${AWS_ACCESS_KEY_ID}
+    - name: AWS_SECRET_ACCESS_KEY
+      value: ${AWS_SECRET_ACCESS_KEY}
+    # ========================================
+    # REDIS CONFIGURATION (ElastiCache)
+    # ========================================
+    - name: REDIS_URL
+      value: "redis://price-is-right-redis.cache.amazonaws.com:6379"
+    - name: REDIS_ENABLED
+      value: "true"
+    - name: REDIS_HOST
+      value: "price-is-right-redis.cache.amazonaws.com"
+    - name: REDIS_PORT
+      value: "6379"
+    # ========================================
+    # GPT-5 FEATURE FLAGS
+    # ========================================
+    - name: USE_GPT5
+      value: "true"
+    - name: USE_GPT5_THINKING
+      value: "false"
