@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Results Display</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        button { padding: 10px 15px; margin: 5px; background: #007bff; color: white; border: none; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .results-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; background: #f9f9f9; }
+        .hidden { display: none !important; }
+        .results-table { width: 100%; border-collapse: collapse; }
+        .results-table th, .results-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .results-table th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>Debug Results Display</h1>
+    
+    <div class="test-section">
+        <h3>Test 1: Check if results-section exists</h3>
+        <button onclick="checkResultsSection()">Check Results Section</button>
+        <div id="section-status"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test 2: Simulate displayCSVResults</h3>
+        <button onclick="simulateDisplayCSVResults()">Simulate CSV Results</button>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test 3: Test showResultsSection</h3>
+        <button onclick="testShowResultsSection()">Show Results Section</button>
+        <button onclick="hideResultsSection()">Hide Results Section</button>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test 4: Direct API Call</h3>
+        <button onclick="testDirectAPICall()">Test API Call</button>
+        <div id="api-result"></div>
+    </div>
+    
+    <!-- Results Section (Legacy) -->
+    <div id="results-section" class="results-section hidden">
+        <div class="results-header">
+            <h2>Processing Results</h2>
+            <div class="results-controls">
+                <button id="clear-results" class="clear-btn">
+                    Clear Results
+                </button>
+            </div>
+        </div>
+        <div id="results-content"></div>
+    </div>
+    
+    <!-- Enhanced Results Section -->
+    <div id="enhanced-results-section" class="enhanced-results-section hidden">
+        <div class="enhanced-results-header">
+            <h2>Enhanced Processing Results</h2>
+            <div class="enhanced-results-controls">
+                <button id="clear-enhanced-results" class="clear-btn">
+                    Clear Results
+                </button>
+            </div>
+        </div>
+        <div id="enhanced-results-content"></div>
+    </div>
+
+    <script>
+        function checkResultsSection() {
+            const resultsSection = document.getElementById('results-section');
+            const enhancedSection = document.getElementById('enhanced-results-section');
+            const statusDiv = document.getElementById('section-status');
+            
+            statusDiv.innerHTML = `
+                <p><strong>Legacy Results Section:</strong> ${resultsSection ? 'Found' : 'Not Found'}</p>
+                <p><strong>Enhanced Results Section:</strong> ${enhancedSection ? 'Found' : 'Not Found'}</p>
+                <p><strong>Legacy Hidden:</strong> ${resultsSection ? resultsSection.classList.contains('hidden') : 'N/A'}</p>
+                <p><strong>Enhanced Hidden:</strong> ${enhancedSection ? enhancedSection.classList.contains('hidden') : 'N/A'}</p>
+            `;
+        }
+        
+        function simulateDisplayCSVResults() {
+            const sampleData = [
+                {
+                    'Item Description': 'Test Item 1',
+                    'Price': '$100.00',
+                    'Source': 'Amazon',
+                    'Search Status': 'Found',
+                    'URL': 'https://example.com/item1'
+                },
+                {
+                    'Item Description': 'Test Item 2',
+                    'Price': 'Not found',
+                    'Source': 'N/A',
+                    'Search Status': 'Not Found',
+                    'URL': 'N/A'
+                }
+            ];
+            
+            // Simulate the displayCSVResults logic
+            const resultsSection = document.getElementById('results-section');
+            const resultsContent = document.getElementById('results-content');
+            
+            if (resultsSection && resultsContent) {
+                // Show the section
+                resultsSection.classList.remove('hidden');
+                resultsSection.style.display = 'block';
+                resultsSection.style.visibility = 'visible';
+                
+                // Create table
+                let html = `
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-number">${sampleData.length}</div>
+                            <div class="stat-label">Total Items</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">1</div>
+                            <div class="stat-label">Found Prices</div>
+                        </div>
+                    </div>
+                    
+                    <table class="results-table">
+                        <thead>
+                            <tr>
+                                <th>Item #</th>
+                                <th>Description</th>
+                                <th>Price</th>
+                                <th>Source</th>
+                                <th>Status</th>
+                                <th>URL</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                
+                sampleData.forEach((item, index) => {
+                    html += `
+                        <tr>
+                            <td>${index + 1}</td>
+                            <td>${item['Item Description']}</td>
+                            <td>${item['Price']}</td>
+                            <td>${item['Source']}</td>
+                            <td>${item['Search Status']}</td>
+                            <td>${item['URL'] !== 'N/A' ? `<a href="${item['URL']}" target="_blank">View</a>` : 'N/A'}</td>
+                        </tr>
+                    `;
+                });
+                
+                html += `
+                        </tbody>
+                    </table>
+                `;
+                
+                resultsContent.innerHTML = html;
+                console.log('Simulated CSV results displayed');
+            } else {
+                console.error('Results section or content not found');
+            }
+        }
+        
+        function testShowResultsSection() {
+            const resultsSection = document.getElementById('results-section');
+            if (resultsSection) {
+                resultsSection.classList.remove('hidden');
+                resultsSection.style.display = 'block';
+                resultsSection.style.visibility = 'visible';
+                console.log('Results section shown');
+            } else {
+                console.error('Results section not found');
+            }
+        }
+        
+        function hideResultsSection() {
+            const resultsSection = document.getElementById('results-section');
+            if (resultsSection) {
+                resultsSection.classList.add('hidden');
+                console.log('Results section hidden');
+            } else {
+                console.error('Results section not found');
+            }
+        }
+        
+        async function testDirectAPICall() {
+            const resultDiv = document.getElementById('api-result');
+            resultDiv.innerHTML = 'Testing API call...';
+            
+            try {
+                const response = await fetch('http://localhost:5000/api/process-item', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        description: 'test item',
+                        costToReplace: 100
+                    })
+                });
+                
+                const data = await response.json();
+                resultDiv.innerHTML = `
+                    <h4>API Response:</h4>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+                console.log('API response:', data);
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+                console.error('API error:', error);
+            }
+        }
+        
+        // Auto-check on load
+        window.addEventListener('load', () => {
+            checkResultsSection();
+        });
+    </script>
+</body>
+</html>

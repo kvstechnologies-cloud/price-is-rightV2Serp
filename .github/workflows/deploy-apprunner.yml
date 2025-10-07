@@ -1,0 +1,48 @@
+name: Deploy to AWS App Runner
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Deploy to App Runner
+      run: |
+        # Get your App Runner service ARN from AWS Console
+        SERVICE_ARN="arn:aws:apprunner:us-east-1:123456789012:service/price-is-right-v2/abc123def456"
+        
+        # Create new deployment
+        aws apprunner start-deployment \
+          --service-arn $SERVICE_ARN \
+          --region ${{ env.AWS_REGION }}
+          
+        echo "Deployment started for App Runner service"
+        
+    - name: Wait for deployment
+      run: |
+        SERVICE_ARN="arn:aws:apprunner:us-east-1:YOUR_ACCOUNT_ID:service/price-is-right-v2/YOUR_SERVICE_ID"
+        
+        # Wait for deployment to complete
+        echo "Waiting for deployment to complete..."
+        aws apprunner wait service-stable \
+          --service-arn $SERVICE_ARN \
+          --region ${{ env.AWS_REGION }}
+          
+        echo "Deployment completed successfully!"

@@ -1,0 +1,244 @@
+{
+  "Coolers": {
+    "default": 39.99,
+    "Beverage Coolers": 49.99,
+    "Ice Chests": 89.99,
+    "Soft Coolers": 29.99,
+    "Electric Coolers": 129.99
+  },
+  "Mattresses": {
+    "default": 299.00,
+    "Queen": 349.00,
+    "King": 449.00,
+    "Twin": 199.00,
+    "Full": 249.00,
+    "Memory Foam": 399.00,
+    "Innerspring": 279.00,
+    "Hybrid": 449.00
+  },
+  "Mailboxes": {
+    "default": 129.00,
+    "Cast Aluminum": 189.00,
+    "Steel": 99.00,
+    "Plastic": 49.99,
+    "Victorian Style": 249.00,
+    "Modern": 159.00,
+    "Post Mount": 89.99,
+    "Wall Mount": 69.99
+  },
+  "Appliances": {
+    "default": 399.00,
+    "Refrigerators": 799.00,
+    "Washers": 599.00,
+    "Dryers": 549.00,
+    "Dishwashers": 449.00,
+    "Microwaves": 149.00,
+    "Stand Mixers": 299.00,
+    "Blenders": 89.99,
+    "Toasters": 49.99,
+    "Coffee Makers": 79.99
+  },
+  "Furniture": {
+    "default": 199.00,
+    "Chairs": 149.00,
+    "Tables": 249.00,
+    "Sofas": 699.00,
+    "Beds": 399.00,
+    "Dressers": 299.00,
+    "Nightstands": 129.00,
+    "Dining Sets": 599.00,
+    "Office Chairs": 199.00,
+    "Recliners": 449.00
+  },
+  "Electronics": {
+    "default": 299.00,
+    "TVs": 449.00,
+    "Laptops": 699.00,
+    "Tablets": 349.00,
+    "Smartphones": 599.00,
+    "Headphones": 149.00,
+    "Speakers": 199.00,
+    "Cameras": 399.00,
+    "Gaming Consoles": 499.00,
+    "Smart Watches": 249.00
+  },
+  "Lighting": {
+    "default": 49.99,
+    "Table Lamps": 79.99,
+    "Floor Lamps": 129.00,
+    "Ceiling Fixtures": 149.00,
+    "Chandeliers": 299.00,
+    "Pendant Lights": 99.99,
+    "LED Bulbs": 12.99,
+    "Smart Lights": 89.99
+  },
+  "Outdoor": {
+    "default": 89.99,
+    "Patio Furniture": 299.00,
+    "Grills": 399.00,
+    "Umbrellas": 149.00,
+    "Fire Pits": 199.00,
+    "Planters": 49.99,
+    "Garden Tools": 39.99,
+    "Hoses": 29.99,
+    "Sprinklers": 24.99
+  },
+  "Kitchen": {
+    "default": 79.99,
+    "Cookware Sets": 149.00,
+    "Knives": 99.99,
+    "Small Appliances": 129.00,
+    "Dinnerware": 89.99,
+    "Glassware": 49.99,
+    "Utensils": 29.99,
+    "Storage Containers": 39.99
+  },
+  "Storage": {
+    "default": 29.99,
+    "Plastic Bins": 19.99,
+    "Storage Boxes": 24.99,
+    "Shelving Units": 89.99,
+    "Closet Organizers": 79.99,
+    "Garage Storage": 149.00,
+    "Baskets": 34.99
+  },
+  "Cleaning": {
+    "default": 149.00,
+    "Vacuum Cleaners": 199.00,
+    "Carpet Cleaners": 249.00,
+    "Steam Cleaners": 179.00,
+    "Pressure Washers": 299.00,
+    "Mops": 29.99,
+    "Brooms": 19.99,
+    "Cleaning Supplies": 24.99
+  },
+  "Tools": {
+    "default": 89.99,
+    "Power Tools": 149.00,
+    "Hand Tools": 49.99,
+    "Tool Sets": 199.00,
+    "Drills": 99.99,
+    "Saws": 179.00,
+    "Wrenches": 39.99,
+    "Screwdrivers": 24.99
+  },
+  "Automotive": {
+    "default": 79.99,
+    "Tires": 149.00,
+    "Batteries": 129.00,
+    "Oil": 29.99,
+    "Filters": 19.99,
+    "Tools": 89.99,
+    "Accessories": 49.99
+  },
+  "Sports": {
+    "default": 99.99,
+    "Exercise Equipment": 299.00,
+    "Bicycles": 399.00,
+    "Sports Gear": 149.00,
+    "Outdoor Recreation": 199.00,
+    "Fitness Accessories": 49.99
+  },
+  "Clothing": {
+    "default": 49.99,
+    "Shirts": 29.99,
+    "Pants": 59.99,
+    "Dresses": 79.99,
+    "Shoes": 89.99,
+    "Jackets": 129.00,
+    "Accessories": 24.99
+  },
+  "Books": {
+    "default": 19.99,
+    "Hardcover": 29.99,
+    "Paperback": 14.99,
+    "Textbooks": 149.00,
+    "Children's Books": 12.99
+  },
+  "Toys": {
+    "default": 39.99,
+    "Action Figures": 24.99,
+    "Board Games": 49.99,
+    "Educational Toys": 59.99,
+    "Electronic Toys": 89.99,
+    "Outdoor Toys": 79.99
+  },
+  "Health": {
+    "default": 29.99,
+    "Supplements": 39.99,
+    "Medical Devices": 149.00,
+    "Personal Care": 19.99,
+    "Fitness Equipment": 199.00
+  },
+  "Beauty": {
+    "default": 24.99,
+    "Skincare": 39.99,
+    "Makeup": 34.99,
+    "Hair Care": 29.99,
+    "Fragrances": 59.99,
+    "Tools": 49.99
+  },
+  "Pet Supplies": {
+    "default": 34.99,
+    "Food": 49.99,
+    "Toys": 19.99,
+    "Beds": 79.99,
+    "Carriers": 89.99,
+    "Grooming": 39.99
+  },
+  "Office": {
+    "default": 49.99,
+    "Supplies": 24.99,
+    "Furniture": 199.00,
+    "Electronics": 149.00,
+    "Storage": 79.99,
+    "Printers": 199.00
+  },
+  "Baby": {
+    "default": 79.99,
+    "Strollers": 199.00,
+    "Car Seats": 249.00,
+    "Cribs": 299.00,
+    "High Chairs": 149.00,
+    "Toys": 29.99,
+    "Clothing": 24.99
+  },
+  "Jewelry": {
+    "default": 149.00,
+    "Rings": 199.00,
+    "Necklaces": 129.00,
+    "Earrings": 89.99,
+    "Bracelets": 99.99,
+    "Watches": 249.00
+  },
+  "Musical Instruments": {
+    "default": 299.00,
+    "Guitars": 399.00,
+    "Keyboards": 349.00,
+    "Drums": 599.00,
+    "Accessories": 49.99
+  },
+  "Crafts": {
+    "default": 39.99,
+    "Supplies": 24.99,
+    "Tools": 49.99,
+    "Kits": 59.99,
+    "Materials": 29.99
+  },
+  "Garden": {
+    "default": 49.99,
+    "Plants": 19.99,
+    "Seeds": 4.99,
+    "Tools": 39.99,
+    "Fertilizer": 24.99,
+    "Planters": 59.99,
+    "Watering": 34.99
+  },
+  "General": {
+    "default": 99.99,
+    "Unknown": 79.99,
+    "Miscellaneous": 49.99,
+    "Replacement": 89.99,
+    "Generic": 59.99
+  }
+}

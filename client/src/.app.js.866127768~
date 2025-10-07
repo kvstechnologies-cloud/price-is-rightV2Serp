@@ -1,0 +1,598 @@
+import { Sidebar } from './components/Sidebar.js';
+import { ChatInterface } from './components/ChatInterface.js';
+import ChatGPTInterface from './components/ChatGPTInterface.js';
+import { ApiService } from './services/ApiService.js';
+
+class InsurancePricingApp {
+    constructor() {
+        // Prevent multiple initialization
+        if (window.appInstance) {
+            return window.appInstance;
+        }
+
+        this.apiService = new ApiService();
+        this.sidebar = null;
+        this.chatInterface = null;
+        this.voiceInput = null;
+        this.currentSection = 'home';
+        this.sidebarInitialized = false;
+        this.voiceInitialized = false;
+
+        window.appInstance = this;
+        this.init();
+    }
+
+    async init() {
+        console.log('Initializing app...');
+
+        try {
+            // Initialize components
+            this.initializeSidebar();
+            this.initializeChatInterface();
+            this.initializeChatGPTInterface();
+            this.bindGlobalEvents();
+
+            // Initialize voice input
+            this.initializeVoiceInput();
+
+            // Load initial section
+            this.loadSection('home');
+
+            // Hide loading screen
+            this.hideLoadingScreen();
+
+            console.log('Insurance Pricing System initialized successfully');
+        } catch (error) {
+            console.error('Error initializing app:', error);
+            this.hideLoadingScreen(); // Hide loading screen even on error
+        }
+    }
+
+    hideLoadingScreen() {
+        const loadingScreen = document.getElementById('loading-screen');
+        if (loadingScreen) {
+            loadingScreen.classList.add('hidden');
+            // Remove from DOM after animation
+            setTimeout(() => {
+                if (loadingScreen.parentNode) {
+                    loadingScreen.remove();
+                }
+            }, 500);
+        }
+    }
+
+    initializeSidebar() {
+        const sidebarElement = document.getElementById('sidebar');
+        if (sidebarElement) {
+            this.sidebar = new Sidebar({
+                container: sidebarElement,
+                onNavigate: (section) => this.handleNavigation(section)
+            });
+        }
+    }
+
+    initializeChatInterface() {
+        const chatContainer = document.getElementById('chat-container');
+        if (chatContainer) {
+            this.chatInterface = new ChatInterface({
+                container: chatContainer,
+                onSendMessage: (message, files) => this.handleSendMessage(message, files),
+                apiService: this.apiService
+            });
+        }
+    }
+
+    initializeChatGPTInterface() {
+        const mainContent = document.getElementById('main-content');
+        if (mainContent) {
+            this.chatGPTInterface = new ChatGPTInterface(mainContent);
+
+            // Override callbacks
+            this.chatGPTInterface.onFilesSelected = (files) => {
+                console.log('Files selected via ChatGPT interface:', files);
+            };
+
+            this.chatGPTInterface.onToleranceChange = (tolerance) => {
+                console.log('Price tolerance changed:', tolerance);
+            };
+        }
+    }
+
+    bindGlobalEvents() {
+        // Send button functionality
+        const sendBtn = document.getElementById('send-btn');
+        const chatInput = document.getElementById('chat-input');
+
+        if (sendBtn && chatInput) {
+            sendBtn.addEventListener('click', () => {
+                this.handleSendMessage();
+            });
+
+            chatInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    this.handleSendMessage();
+                }
+            });
+
+            chatInput.addEventListener('input', () => {
+                const hasText = chatInput.value.trim().length > 0;
+                sendBtn.disabled = !hasText;
+
+                // Auto-resize
+                chatInput.style.height = 'auto';
+                chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+            });
+        }
+
+        // Setup sidebar toggle
+        this.setupSidebarToggle();
+
+        // Window resize handler
+        window.addEventListener('resize', () => {
+            this.handleResize();
+        });
+    }
+
+    setupSidebarToggle() {
+        // Prevent multiple event listeners
+        if (this.sidebarInitialized) return;
+
+        const sidebarToggle = document.getElementById('sidebar-toggle');
+        const sidebar = document.getElementById('sidebar');
+        const mainContent = document.getElementById('main-content');
+
+        console.log('Setting up sidebar toggle...', {
+            sidebarToggle: !!sidebarToggle,
+            sidebar: !!sidebar,
+            mainContent: !!mainContent
+        });
+
+        if (sidebarToggle && sidebar && mainContent) {
+            sidebarToggle.addEventListener('click', () => {
+                sidebar.classList.toggle('active');
+                mainContent.classList.toggle('sidebar-open');
+            });
+            this.sidebarInitialized = true;
+        }
+    }
+
+    async handleSendMessage(message, files) {
+        const chatInput = document.getElementById('chat-input');
+        const sendBtn = document.getElementById('send-btn');
+        const chatMessages = document.getElementById('chat-messages');
+        const welcomeContent = document.querySelector('.welcome-content');
+
+        // Get message from input if not provided
+        if (!message && chatInput) {
+            message = chatInput.value.trim();
+        }
+
+        if (!message) return;
+
+        // Get selected files from ChatGPT interface
+        const selectedFiles = this.chatGPTInterface?.getSelectedFiles() || files || [];
+
+        try {
+            // Show chat messages area and hide welcome
+            if (welcomeContent && chatMessages) {
+                welcomeContent.style.display = 'none';
+                chatMessages.classList.remove('hidden');
+                chatMessages.style.display = 'flex';
+            }
+
+            // Clear input
+            if (chatInput) {
+                chatInput.value = '';
+                chatInput.style.height = 'auto';
+            }
+            if (sendBtn) {
+                sendBtn.disabled = true;
+            }
+
+            // Clear selected files
+            this.chatGPTInterface?.clearFiles();
+
+            // Add user message to chat
+            this.addMessageToChat({
+                type: 'user',
+                content: message,
+                files: selectedFiles,
+                timestamp: new Date()
+            });
+
+            // Show typing indicator
+            this.showTypingIndicator();
+
+            // Send to API (simulate for now)
+            setTimeout(() => {
+                this.hideTypingIndicator();
+                this.addMessageToChat({
+                    type: 'assistant',
+                    content: `I understand you're looking for insurance information. Let me help you with "${message}". Based on your query, I can provide personalized quotes and recommendations.`,
+                    timestamp: new Date()
+                });
+            }, 1500);
+
+        } catch (error) {
+            console.error('Error sending message:', error);
+            this.hideTypingIndicator();
+            this.showError('Failed to send message. Please try again.');
+        }
+    }
+
+    addMessageToChat(messageData) {
+        const chatMessages = document.getElementById('chat-messages');
+        if (!chatMessages) return;
+
+        const messageElement = document.createElement('div');
+        messageElement.className = `message ${messageData.type}-message`;
+
+        const avatar = messageData.type === 'user' ? 
+            '<i class="fas fa-user"></i>' : 
+            '<i class="fas fa-robot"></i>';
+
+        let filesHtml = '';
+        if (messageData.files && messageData.files.length > 0) {
+            const filesList = messageData.files.map(file => 
+                `<span class="file-tag">📎 ${file.name}</span>`
+            ).join('');
+            filesHtml = `<div class="message-files">${filesList}</div>`;
+        }
+
+        messageElement.innerHTML = `
+            <div class="message-avatar">
+                ${avatar}
+            </div>
+            <div class="message-content">
+                <p>${messageData.content}</p>
+                ${filesHtml}
+                <div class="message-time">${this.formatTime(messageData.timestamp)}</div>
+            </div>
+        `;
+
+        chatMessages.appendChild(messageElement);
+        this.scrollToBottom(chatMessages);
+    }
+
+    showTypingIndicator() {
+        const chatMessages = document.getElementById('chat-messages');
+        if (!chatMessages) return;
+
+        const typingDiv = document.createElement('div');
+        typingDiv.className = 'typing-indicator';
+        typingDiv.id = 'typing-indicator';
+        typingDiv.innerHTML = `
+            <div class="message-avatar">
+                <i class="fas fa-robot"></i>
+            </div>
+            <div class="typing-content">
+                <div class="typing-dots">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+            </div>
+        `;
+
+        chatMessages.appendChild(typingDiv);
+        this.scrollToBottom(chatMessages);
+    }
+
+    hideTypingIndicator() {
+        const typingIndicator = document.getElementById('typing-indicator');
+        if (typingIndicator) {
+            typingIndicator.remove();
+        }
+    }
+
+    scrollToBottom(element) {
+        setTimeout(() => {
+            element.scrollTop = element.scrollHeight;
+        }, 100);
+    }
+
+    formatTime(date) {
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    showError(message) {
+        console.error(message);
+        // Could implement toast notifications here
+    }
+
+    handleNavigation(section) {
+        console.log('Navigation to:', section);
+        this.loadSection(section);
+    }
+
+    loadSection(section) {
+        console.log('Loading section:', section);
+        this.currentSection = section;
+
+        // Update active state in sidebar
+        if (this.sidebar) {
+            this.sidebar.setActiveSection(section);
+        }
+
+        // Handle section-specific logic
+        switch (section) {
+            case 'home':
+                this.loadHomeSection();
+                break;
+            case 'info':
+                this.loadInfoSection();
+                break;
+            case 'settings':
+                this.loadSettingsSection();
+                break;
+            default:
+                this.loadHomeSection();
+        }
+    }
+
+    loadHomeSection() {
+        console.log('Loading home section');
+        // Home section is already loaded by default
+    }
+
+    loadInfoSection() {
+        console.log('Loading info section');
+        // Could show info modal or navigate to info page
+    }
+
+    loadSettingsSection() {
+        console.log('Loading settings section');
+        // Could show settings modal or navigate to settings page
+    }
+
+    handleResize() {
+        // Handle responsive changes
+        if (this.chatInterface) {
+            this.chatInterface.handleResize();
+        }
+    }
+
+    initializeVoiceInput() {
+        // Prevent multiple initialization
+        if (this.voiceInitialized || window.voiceInputManager) {
+            console.log('Voice input already initialized, skipping...');
+            return;
+        }
+
+        // Check for browser support
+        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+            console.warn('Voice input not supported in this browser.');
+            return;
+        }
+
+        const voiceBtn = document.getElementById('voice-btn');
+        const voiceModal = document.getElementById('voice-modal');
+        
+        if (!voiceBtn || !voiceModal) {
+            console.warn('Voice UI elements not found');
+            return;
+        }
+
+        // Create a single voice manager instance
+        const voiceManager = {
+            recognition: null,
+            isRecording: false,
+            isInitialized: false,
+            
+            init() {
+                if (this.isInitialized) return;
+                
+                try {
+                    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    this.recognition = new SpeechRecognition();
+                    this.recognition.continuous = false;
+                    this.recognition.interimResults = true;
+                    this.recognition.lang = 'en-US';
+                    this.recognition.maxAlternatives = 1;
+
+                    this.recognition.onstart = () => {
+                        this.isRecording = true;
+                        const startBtn = document.getElementById('start-recording');
+                        const stopBtn = document.getElementById('stop-recording');
+                        if (startBtn) startBtn.disabled = true;
+                        if (stopBtn) stopBtn.disabled = false;
+                        this.updateStatus('Listening... Speak now');
+                        console.log('Voice recognition started');
+                    };
+
+                    this.recognition.onresult = (event) => {
+                        let transcript = '';
+                        for (let i = event.resultIndex; i < event.results.length; i++) {
+                            transcript += event.results[i][0].transcript;
+                        }
+                        
+                        const transcriptEl = document.getElementById('voice-transcript');
+                        if (transcriptEl) {
+                            transcriptEl.textContent = transcript;
+                            transcriptEl.classList.add('visible');
+                        }
+
+                        if (event.results[event.results.length - 1].isFinal) {
+                            const chatInput = document.getElementById('chat-input');
+                            if (chatInput && transcript.trim()) {
+                                chatInput.value = transcript.trim();
+                                chatInput.dispatchEvent(new Event('input'));
+                            }
+                            setTimeout(() => this.closeModal(), 500);
+                        }
+                    };
+
+                    this.recognition.onerror = (event) => {
+                        console.error('Voice recognition error:', event.error);
+                        this.isRecording = false;
+                        this.updateButtonStates();
+                        
+                        let errorMessage = 'Voice input failed. Please try again.';
+                        
+                        switch (event.error) {
+                            case 'no-speech':
+                                errorMessage = 'No speech detected. Try speaking louder.';
+                                break;
+                            case 'not-allowed':
+                                errorMessage = 'Microphone access denied. Please allow microphone access.';
+                                break;
+                            case 'network':
+                                errorMessage = 'Network error. Please check your connection.';
+                                break;
+                            case 'aborted':
+                                return; // Ignore aborted errors
+                        }
+                        
+                        this.updateStatus(errorMessage);
+                    };
+
+                    this.recognition.onend = () => {
+                        this.isRecording = false;
+                        this.updateButtonStates();
+                        console.log('Voice recognition ended');
+                    };
+
+                    this.isInitialized = true;
+                } catch (error) {
+                    console.error('Error initializing voice recognition:', error);
+                }
+            },
+
+            start() {
+                if (this.isRecording) {
+                    console.log('Already recording, ignoring start request');
+                    return;
+                }
+                
+                if (!this.isInitialized) {
+                    this.init();
+                }
+                
+                try {
+                    if (this.recognition) {
+                        this.recognition.start();
+                    }
+                } catch (error) {
+                    console.error('Error starting recognition:', error);
+                    this.updateStatus('Could not start voice recording');
+                    this.isRecording = false;
+                    this.updateButtonStates();
+                }
+            },
+
+            stop() {
+                if (this.recognition && this.isRecording) {
+                    try {
+                        this.recognition.stop();
+                    } catch (error) {
+                        console.error('Error stopping recognition:', error);
+                    }
+                }
+                this.isRecording = false;
+                this.updateButtonStates();
+            },
+
+            updateButtonStates() {
+                const startBtn = document.getElementById('start-recording');
+                const stopBtn = document.getElementById('stop-recording');
+                
+                if (startBtn) startBtn.disabled = this.isRecording;
+                if (stopBtn) stopBtn.disabled = !this.isRecording;
+            },
+
+            openModal() {
+                voiceModal.classList.remove('hidden');
+                this.updateStatus('Click Start Recording to begin');
+                this.updateButtonStates();
+                
+                const transcriptEl = document.getElementById('voice-transcript');
+                if (transcriptEl) {
+                    transcriptEl.textContent = 'Your speech will appear here...';
+                    transcriptEl.classList.remove('visible');
+                }
+            },
+
+            closeModal() {
+                this.stop();
+                voiceModal.classList.add('hidden');
+            },
+
+            updateStatus(message) {
+                const status = document.getElementById('voice-status');
+                if (status) {
+                    status.textContent = message;
+                }
+            }
+        };
+
+        // Initialize the voice manager only once
+        if (!window.voiceInputManager) {
+            voiceManager.init();
+            window.voiceInputManager = voiceManager;
+        }
+
+        // Remove any existing event listeners and add new ones
+        const voiceBtn = document.getElementById('voice-btn');
+        if (voiceBtn) {
+            voiceBtn.onclick = null;
+            voiceBtn.onclick = () => window.voiceInputManager.openModal();
+        }
+
+        const startBtn = document.getElementById('start-recording');
+        const stopBtn = document.getElementById('stop-recording');
+        const closeBtn = voiceModal.querySelector('.close-button');
+
+        if (startBtn) {
+            startBtn.onclick = null;
+            startBtn.onclick = () => window.voiceInputManager.start();
+        }
+
+        if (stopBtn) {
+            stopBtn.onclick = null;
+            stopBtn.onclick = () => window.voiceInputManager.stop();
+        }
+
+        if (closeBtn) {
+            closeBtn.onclick = null;
+            closeBtn.onclick = () => window.voiceInputManager.closeModal();
+        }
+
+        // Close modal when clicking outside
+        voiceModal.onclick = (e) => {
+            if (e.target === voiceModal) {
+                window.voiceInputManager.closeModal();
+            }
+        };
+
+        this.voiceInitialized = true;
+        console.log('Voice input initialized successfully');
+    }
+}
+
+// Single initialization point
+function initializeApp() {
+    // Check if app is already initialized
+    if (window.appInstance) {
+        console.log('App already initialized, skipping...');
+        return window.appInstance;
+    }
+
+    console.log('Starting Insurance Pricing System...');
+    return new InsurancePricingApp();
+}
+
+// Prevent multiple initializations
+if (!window.appInitialized) {
+    window.appInitialized = true;
+    
+    // Only initialize once when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeApp);
+    } else {
+        // DOM is already ready
+        initializeApp();
+    }
+}
+
+console.log('App script loaded');

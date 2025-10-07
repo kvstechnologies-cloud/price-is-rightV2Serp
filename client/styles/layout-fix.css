@@ -1,0 +1,430 @@
+/* Layout Fixes for Header Overlap and Button Issues */
+
+/* Ensure sidebar header doesn't overflow */
+.sidebar-header {
+    min-height: 60px;
+    max-height: 60px;
+    padding: 8px 16px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+}
+
+.logo {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    color: white !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 180px;
+}
+
+.logo i {
+    font-size: 20px !important;
+    color: var(--primary-color) !important;
+    flex-shrink: 0;
+}
+
+.logo span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Fix sidebar close button positioning */
+.sidebar-close {
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 50% !important;
+    background: rgba(255, 255, 255, 0.1) !important;
+    border: none !important;
+    color: white !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    flex-shrink: 0;
+}
+
+/* Fix main content layout */
+.main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-primary);
+    overflow: hidden;
+    width: 100%;
+}
+
+/* ChatGPT-style sliding sidebar */
+.sidebar {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 280px !important;
+    height: 100vh !important;
+    transform: translateX(-100%) !important;
+    transition: transform 0.3s ease !important;
+    z-index: 1000;
+}
+
+.sidebar.open {
+    transform: translateX(0) !important;
+}
+
+/* All screen sizes - hide sidebar by default */
+.main-content {
+    margin-left: 0 !important;
+    width: 100vw !important;
+    transition: margin-left 0.3s ease, width 0.3s ease !important;
+}
+
+.main-content.sidebar-open {
+    margin-left: 280px !important;
+    width: calc(100vw - 280px) !important;
+}
+
+.sidebar-toggle {
+    display: flex !important;
+    position: fixed !important;
+    top: 16px !important;
+    left: 16px !important;
+    z-index: 1001 !important;
+    background: var(--bg-primary) !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-secondary) !important;
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 8px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+}
+
+.sidebar-toggle:hover {
+    background: var(--hover-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.sidebar-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: rgba(0, 0, 0, 0.5) !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    transition: all 0.3s ease !important;
+    z-index: 999 !important;
+}
+
+.sidebar-overlay.active {
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* Popup visibility fixes */
+.attachment-popup, .tools-popup, .cloud-storage-popup {
+    display: block !important;
+    position: fixed !important;
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+    z-index: 1000 !important;
+    width: 240px !important;
+    max-width: 240px !important;
+    padding: 0 !important;
+    /* Position will be set by JavaScript */
+}
+
+.attachment-popup.hidden, .tools-popup.hidden, .cloud-storage-popup.hidden {
+    display: none !important;
+}
+
+/* Override any hidden class */
+.popup.hidden {
+    display: none !important;
+}
+
+.popup.active.hidden {
+    display: block !important;
+}
+
+.popup-section {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+}
+
+.popup-item {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    padding: 8px 12px !important;
+    border: none !important;
+    background: transparent !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    font-size: 14px !important;
+    color: var(--text-primary) !important;
+    text-align: left !important;
+    width: 100% !important;
+}
+
+.popup-item:hover {
+    background: var(--hover-color) !important;
+}
+
+.popup-item i {
+    width: 16px !important;
+    height: 16px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.tool-item {
+    padding: 12px !important;
+}
+
+.tool-label {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    margin-bottom: 8px !important;
+    font-weight: 500 !important;
+    color: var(--text-primary) !important;
+}
+
+.tolerance-dropdown {
+    width: 100% !important;
+    padding: 8px !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 6px !important;
+    background: var(--bg-primary) !important;
+    font-size: 14px !important;
+}
+
+/* Drag and drop styling */
+.drag-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: rgba(59, 130, 246, 0.1) !important;
+    backdrop-filter: blur(2px) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 9999 !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    transition: all 0.2s ease !important;
+}
+
+.drag-overlay.active {
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+.drag-overlay-content {
+    text-align: center !important;
+    color: var(--primary-color) !important;
+    padding: 40px !important;
+    border: 2px dashed var(--primary-color) !important;
+    border-radius: 12px !important;
+    background: rgba(var(--bg-primary-rgb), 0.9) !important;
+}
+
+.drag-overlay-content i {
+    font-size: 48px !important;
+    margin-bottom: 16px !important;
+}
+
+.drag-overlay-content h3 {
+    margin: 0 0 8px 0 !important;
+    font-size: 20px !important;
+    font-weight: 600 !important;
+}
+
+.drag-overlay-content p {
+    margin: 0 !important;
+    font-size: 14px !important;
+    opacity: 0.8 !important;
+}
+
+/* Selected files styling */
+.selected-files {
+    margin-top: 12px !important;
+    padding: 12px !important;
+    background: var(--bg-secondary) !important;
+    border-radius: 8px !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+.selected-files.hidden {
+    display: none !important;
+}
+
+.files-container {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+}
+
+.selected-file {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 8px 12px !important;
+    background: var(--bg-primary) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 6px !important;
+}
+
+.file-info {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+}
+
+.file-details {
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.file-name {
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    color: #374151 !important;
+}
+
+.file-size {
+    font-size: 12px !important;
+    color: #6b7280 !important;
+}
+
+.remove-file {
+    background: none !important;
+    border: none !important;
+    color: #6b7280 !important;
+    cursor: pointer !important;
+    padding: 4px !important;
+    border-radius: 4px !important;
+}
+
+.remove-file:hover {
+    background: #f3f4f6 !important;
+    color: #ef4444 !important;
+}
+
+/* Cloud storage popup positioning */
+.cloud-storage-popup {
+    position: absolute !important;
+    bottom: 80px !important;
+    right: 0 !important;
+    background: var(--bg-primary) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    z-index: 1000 !important;
+    min-width: 280px !important;
+    padding: 8px !important;
+}
+
+.cloud-storage-popup.hidden {
+    display: none !important;
+}
+
+/* Welcome title styling */
+.welcome-title {
+    font-size: 1.5em !important;
+    font-weight: 700 !important;
+    color: var(--text-primary) !important;
+}
+
+/* Button fixes */
+.add-btn, .tools-btn {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: none !important;
+    border: none !important;
+    color: var(--text-secondary) !important;
+    cursor: pointer !important;
+    padding: 8px !important;
+    border-radius: 50% !important;
+    transition: all 0.2s ease !important;
+    min-width: 36px;
+    min-height: 36px;
+}
+
+.add-btn:hover, .tools-btn:hover {
+    background: var(--hover-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.tools-btn {
+    border-radius: 16px !important;
+    padding: 8px 12px !important;
+    gap: 6px !important;
+    min-width: auto;
+}
+
+.tools-btn span {
+    font-size: 14px !important;
+    font-weight: 500 !important;
+}
+
+/* Input container fixes */
+.input-container {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 24px;
+    padding: 8px 12px;
+    transition: all 0.2s ease;
+    margin: 0 auto;
+    max-width: 768px;
+    width: 100%;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.input-actions-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: 12px;
+}
+
+/* Chat header fixes */
+.chat-header {
+    padding: 24px;
+    text-align: center;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-primary);
+}
+
+.chat-header h1 {
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.chat-header p {
+    color: var(--text-secondary);
+    font-size: 16px;
+}

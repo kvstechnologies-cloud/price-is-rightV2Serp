@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Insurance Pricing System</title>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+
+    <!-- Global Configuration -->
+    <script>
+        window.CONFIG = {
+            API_BASE_URL: (function() {
+                // Local development - preserve existing functionality
+                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                    return 'http://localhost:5000';
+                }
+                // Production - AWS S3 website, use API Gateway
+                else if (window.location.hostname.includes('s3-website') || window.location.hostname.includes('amazonaws.com')) {
+                    return 'https://3981g42ga1.execute-api.us-east-1.amazonaws.com/dev/api';
+                }
+                // Fallback for other environments
+                else {
+                    return window.location.origin + '/api';
+                }
+            })(),
+            API_KEY: '',
+            DEVELOPMENT_MODE: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        };
+        
+        // Debug logging for API URL detection
+        console.log('🔍 Environment Detection:', {
+            hostname: window.location.hostname,
+            apiBaseUrl: window.CONFIG.API_BASE_URL,
+            developmentMode: window.CONFIG.DEVELOPMENT_MODE
+        });
+    </script>
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <!-- SheetJS for Excel file generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/chat.css">
+    <link rel="stylesheet" href="styles/sidebar.css">
+    <link rel="stylesheet" href="styles/components.css">
+    <link rel="stylesheet" href="styles/attachments.css">
+    <link rel="stylesheet" href="styles/chatgpt-interface.css">
+    <link rel="stylesheet" href="styles/auth.css">
+    <link rel="stylesheet" href="styles/cloud-storage.css">
+    <link rel="stylesheet" href="styles/layout-fix.css">
+    <link rel="stylesheet" href="styles/loading.css">
+    <link rel="stylesheet" href="styles/enhanced-results.css">
+    <link rel="stylesheet" href="styles/audit-dashboard.css">
+</head>
+<body class="page-height">
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="loading-screen">
+        <div class="loading-spinner"></div>
+        <p>Loading Insurance Pricing System...</p>
+    </div>
+
+    <!-- Main Application Container -->
+    <div id="main-container" class="main-container viewport-height">
+        <!-- Navigation & Chat History Sidebar -->
+        <div id="chat-history-sidebar" class="chat-history-sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>Insurance Pricing</span>
+                </div>
+            </div>
+            
+            <!-- Navigation Section -->
+            <div class="sidebar-nav">
+                <h3 class="nav-section-title">Navigation</h3>
+                <ul class="nav-list">
+                    <li class="nav-item" data-section="home">
+                        <i class="fas fa-home"></i>
+                        <span>Home</span>
+                    </li>
+                    <li class="nav-item" data-section="info">
+                        <i class="fas fa-info-circle"></i>
+                        <span>Information</span>
+                    </li>
+                    <li class="nav-item" data-section="settings">
+                        <i class="fas fa-cog"></i>
+                        <span>Settings</span>
+                    </li>
+                    <li class="nav-item" data-section="profile">
+                        <i class="fas fa-user"></i>
+                        <span>Profile</span>
+                    </li>
+                    <li class="nav-item" data-section="admin">
+                        <i class="fas fa-tools"></i>
+                        <span>Admin</span>
+                    </li>
+                    <li class="nav-item" data-section="audit">
+                        <i class="fas fa-chart-bar"></i>
+                        <span>Audit Dashboard</span>
+                    </li>
+                </ul>
+            </div>
+            
+            <!-- Chat History Section -->
+            <div class="chat-history-section">
+                <div class="chat-history-header">
+                    <h3 class="nav-section-title">Chat History</h3>
+                    <button id="new-chat-btn" class="new-chat-btn" title="Start new chat">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                
+                <div class="chat-history-list" id="chat-history-list">
+                    <!-- Chat history items will be dynamically added here -->
+                </div>
+            </div>
+            
+            <div class="sidebar-footer">
+                <div class="nav-item" data-section="logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </div>
+                <button id="clear-history-btn" class="clear-history-btn" title="Clear all chat history">
+                    <i class="fas fa-trash"></i>
+                    Clear History
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div id="main-content" class="main-content viewport-height">
+            <!-- Header -->
+            <div class="content-header">
+                <button id="sidebar-toggle" class="sidebar-toggle" title="Toggle sidebar">
+                    <i class="fas fa-bars"></i>
+                </button>
+                
+                <button id="chat-history-toggle" class="chat-history-toggle" title="Toggle chat history">
+                    <i class="fas fa-history"></i>
+                </button>
+                
+                <div class="header-title">
+                    <h1>Insurance Pricing Assistant</h1>
+                </div>
+                
+                <div class="header-actions">
+                    <button id="test-connection-btn" class="test-connection-btn" title="Test connection">
+                        <i class="fas fa-wifi"></i>
+                        Test
+                    </button>
+                    <button id="theme-toggle-btn" class="theme-toggle-btn" title="Toggle theme">
+                        <i class="fas fa-sun"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Chat Container -->
+            <div class="chat-container">
+                <!-- Welcome Screen (shown when no chat is selected) -->
+                <div id="welcome-screen" class="welcome-screen">
+                    <div class="welcome-content">
+                        <div class="welcome-icon">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <h1>Insurance Pricing Assistant</h1>
+                        <p>Upload CSV/Excel files or ask questions to get pricing information</p>
+                        <button id="start-new-chat-btn" class="start-new-chat-btn">
+                            <i class="fas fa-plus"></i>
+                            Start New Chat
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Active Chat Area (hidden by default) -->
+                <div id="active-chat-area" class="active-chat-area hidden">
+                    <!-- Chat Messages -->
+                    <div id="chat-messages" class="chat-messages"></div>
+
+                    <!-- Results Display Section -->
+                    <div id="results-section" class="results-section hidden">
+                        <div class="processing-results-header">
+                            <div class="processing-results-top-bar">
+                                <div class="processing-results-title">Processing Results</div>
+                                <div class="processing-results-actions">
+                                    <button id="download-excel-btn" class="btn btn-primary">
+                                        <i class="fas fa-download"></i>
+                                        Download Excel
+                                    </button>
+                                    <button id="clear-results" class="btn btn-outline-danger">
+                                        <i class="fas fa-times"></i>
+                                        Clear Results
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="processing-results-summary">
+                                <div class="summary-card">
+                                    <div class="stat-icon">📋</div>
+                                    <div class="summary-card-content">
+                                        <div class="summary-card-value" id="total-items">0</div>
+                                        <div class="summary-card-label">Total Items</div>
+                                    </div>
+                                </div>
+                                <div class="summary-card">
+                                    <div class="stat-icon" style="background: #ecfdf5; color: var(--green);">✔</div>
+                                    <div class="summary-card-content">
+                                        <div class="summary-card-value" id="found-prices">0</div>
+                                        <div class="summary-card-label">Found Prices</div>
+                                    </div>
+                                </div>
+                                <div class="summary-card success">
+                                    <div class="stat-icon" style="background: #ecfdf5; color: var(--green);">📈</div>
+                                    <div class="summary-card-content">
+                                        <div class="summary-card-value" id="success-rate">0%</div>
+                                        <div class="summary-card-label">Success Rate</div>
+                                    </div>
+                                </div>
+                                <div class="summary-card warning">
+                                    <div class="stat-icon" style="background: #fef3c7; color: var(--amber);">⏱</div>
+                                    <div class="summary-card-content">
+                                        <div class="summary-card-value" id="processing-time">0s</div>
+                                        <div class="summary-card-label">Processing Time</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="results-content"></div>
+                    </div>
+
+                    <!-- Enhanced Processing Results Section -->
+                    <div id="enhanced-results-section" class="enhanced-results-section hidden">
+                        <div class="processing-results-header">
+                            <div class="processing-results-top-bar" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                                <div class="processing-results-title">Processing Results</div>
+                                <div class="processing-results-actions" style="display: flex; gap: 12px; justify-content: flex-end; margin-left: auto;">
+                                    <button id="enhanced-download-excel-btn" class="btn btn-primary">
+                                        <i class="fas fa-download"></i>
+                                        Download Excel
+                                    </button>
+                                    <button id="clear-enhanced-results" class="btn btn-outline-danger">
+                                        <i class="fas fa-times"></i>
+                                        Clear Results
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="processing-results-summary">
+                                <div class="summary-card">
+                                    <div class="stat-icon">📋</div>
+                                    <div class="summary-card-content">
+                                        <div class="summary-card-value" id="enhanced-total-items">0</div>
+                                        <div class="summary-card-label">Total Items</div>
+                                    </div>
+                                </div>
+                                <div class="summary-card">
+                                    <div class="stat-icon" style="background: #ecfdf5; color: var(--green);">✔</div>
+                                    <div class="summary-card-content">
+                                        <div class="summary-card-value" id="enhanced-found-prices">0</div>
+                                        <div class="summary-card-label">Found Prices</div>
+                                    </div>
+                                </div>
+                                <div class="summary-card success">
+                                    <div class="stat-icon" style="background: #ecfdf5; color: var(--green);">📈</div>
+                                    <div class="summary-card-content">
+                                        <div class="summary-card-value" id="enhanced-success-rate">0%</div>
+                                        <div class="summary-card-label">Success Rate</div>
+                                    </div>
+                                </div>
+                                <div class="summary-card warning">
+                                    <div class="stat-icon" style="background: #fef3c7; color: var(--amber);">⏱</div>
+                                    <div class="summary-card-content">
+                                        <div class="summary-card-value" id="enhanced-processing-time">0s</div>
+                                        <div class="summary-card-label">Processing Time</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="enhanced-results-content"></div>
+                    </div>
+
+                    <!-- Input Section -->
+                    <div class="chat-input-section">
+                        <!-- Selected Files Display -->
+                        <div id="selected-files" class="selected-files hidden">
+                            <div class="files-container"></div>
+                        </div>
+
+                        <!-- Main Input Container -->
+                        <div class="input-container">
+                            <!-- Left Actions -->
+                            <div class="input-actions-left">
+                                <button id="add-btn" class="add-btn" title="Add files">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                                <button id="tools-btn" class="tools-btn" title="Price Tolerance">
+                                    <i class="fas fa-wrench"></i>
+                                    <span>Price Tolerance</span>
+                                </button>
+                            </div>
+
+                            <!-- Text Input -->
+                            <textarea 
+                                id="chat-input" 
+                                placeholder="Find your product price..."
+                                rows="1"
+                            ></textarea>
+
+                            <!-- Right Actions -->
+                            <div class="input-actions">
+                                <button id="voice-btn" class="voice-btn" title="Voice input">
+                                    <i class="fas fa-microphone"></i>
+                                </button>
+                                <button id="send-btn" class="send-btn" title="Find Price" disabled>
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Powered by text -->
+                        <div class="powered-by">
+                            Powered by KVS Technologies
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- Attachment Popup -->
+    <div id="attachment-popup" class="attachment-popup hidden">
+        <div class="popup-section">
+            <button class="popup-item" data-action="add-files">
+                <i class="fas fa-upload"></i>
+                <span>Upload from computer</span>
+            </button>
+            <button class="popup-item" data-action="add-from-apps">
+                <i class="fas fa-cloud"></i>
+                <span>Add from Google Drive or OneDrive</span>
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Cloud Storage Popup -->
+    <div id="cloud-storage-popup" class="cloud-storage-popup hidden">
+        <div class="popup-section">
+            <button class="popup-item" data-action="google-drive">
+                <i class="fab fa-google-drive"></i>
+                <span>Google Drive</span>
+            </button>
+            <button class="popup-item" data-action="onedrive-personal">
+                <i class="fab fa-microsoft"></i>
+                <span>OneDrive Personal</span>
+            </button>
+            <button class="popup-item" data-action="onedrive-work">
+                <i class="fas fa-building"></i>
+                <span>OneDrive for Business</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Tools Popup -->
+    <div id="tools-popup" class="tools-popup hidden">
+        <div class="tool-item">
+            <div class="tool-label">
+                <i class="fas fa-percentage"></i>
+                <span>Price Tolerance</span>
+            </div>
+            <select id="priceTolerance" class="tolerance-dropdown">
+                <option value="10">±10% (Very Strict)</option>
+                <option value="20">±20% (Strict)</option>
+                <option value="30">±30% (Moderate)</option>
+                <option value="50" selected>±50% (Flexible)</option>
+                <option value="75">±75% (Very Flexible)</option>
+            </select>
+        </div>
+        <div class="tool-item">
+            <div class="tool-label">
+                <i class="fas fa-cog"></i>
+                <span>Processing Mode</span>
+            </div>
+            <select id="processingMode" class="mode-dropdown">
+                <option value="enhanced" selected>Enhanced Processing</option>
+                <option value="legacy">Legacy CSV Processing</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Drag Overlay -->
+    <div id="drag-overlay" class="drag-overlay">
+        <div class="drag-overlay-content">
+            <i class="fas fa-file-upload"></i>
+            <h3>Drop files here</h3>
+            <p>Release to upload your documents</p>
+        </div>
+    </div>
+
+    <!-- Hidden File Input -->
+    <input type="file" id="file-input" multiple accept=".csv,.xls,.xlsx,.xlsm,.xlsb,image/*" style="display: none;">
+</div>
+
+<!-- Voice Input Modal -->
+<div id="voice-modal" class="voice-modal">
+    <div class="voice-modal-content">
+        <div class="voice-modal-header">
+            <h3>Voice Input</h3>
+            <button id="voice-modal-close" class="voice-modal-close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="voice-modal-body">
+            <div id="voice-status" class="voice-status">
+                Click the microphone to start speaking
+            </div>
+            <div class="voice-controls">
+                <button id="start-recording" class="voice-btn-record">
+                    <i class="fas fa-microphone"></i>
+                    Start Recording
+                </button>
+                <button id="stop-recording" class="voice-btn-stop" disabled>
+                    <i class="fas fa-stop"></i>
+                    Stop Recording
+                </button>
+            </div>
+            <div id="voice-transcript" class="voice-transcript"></div>
+            <div class="voice-actions" id="voice-actions" style="display: none;">
+                <button id="use-transcript" class="use-transcript-btn">
+                    <i class="fas fa-check"></i>
+                    Use This Transcript
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sheet Selection Modal -->
+<div id="sheet-selection-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Select Sheet to Process</h3>
+            <button id="sheet-selection-close" class="modal-close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <p>This Excel file contains multiple sheets. Please select one sheet to process:</p>
+            <div id="sheet-list" class="sheet-list">
+                <!-- Sheets will be populated dynamically -->
+            </div>
+        </div>
+                                <div class="modal-footer">
+                            <button id="cancel-sheet-selection" class="btn btn-secondary">Cancel</button>
+                            <button id="confirm-sheet-selection" class="btn btn-primary">Confirm Selection</button>
+                        </div>
+    </div>
+</div>
+
+<!-- Field Mapping Wizard Modal -->
+<div id="field-mapping-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Field Mapping Wizard</h3>
+            <button id="field-mapping-close" class="modal-close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <p>Some required fields couldn't be automatically mapped. Please map them manually:</p>
+            <div id="field-mapping-form" class="field-mapping-form">
+                <!-- Field mappings will be populated dynamically -->
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="cancel-field-mapping" class="btn btn-secondary">Cancel</button>
+            <button id="confirm-field-mapping" class="btn btn-primary">Confirm Mapping</button>
+        </div>
+    </div>
+</div>
+
+<!-- App Configuration -->
+<script type="module">
+    import { appConfig } from './src/config/app-config.js';
+    console.log('App configuration loaded in index.html:', appConfig);
+</script>
+
+<!-- Voice Input Component -->
+<script type="module" src="src/components/VoiceInput.js?v=38"></script>
+
+<!-- Auth Debug Utility -->
+<script type="module" src="src/utils/auth-debug.js?v=38"></script>
+
+<!-- Download Functions -->
+<script>
+    function downloadCSV(fileName, items) {
+        const csvContent = convertToCSV(items);
+        downloadFile(csvContent, fileName.replace(/\.[^/.]+$/, '_processed.csv'), 'text/csv');
+    }
+    
+    function downloadSuccessfulCSV(fileName, items) {
+        const csvContent = convertToCSV(items);
+        downloadFile(csvContent, fileName.replace(/\.[^/.]+$/, '_successful.csv'), 'text/csv');
+    }
+    
+    function convertToCSV(items) {
+        if (!items || items.length === 0) return '';
+        
+        const headers = Object.keys(items[0]);
+        const csvRows = [headers.join(',')];
+        
+        items.forEach(item => {
+            const values = headers.map(header => {
+                const value = item[header];
+                return typeof value === 'string' ? `"${value.replace(/"/g, '""')}"` : value;
+            });
+            csvRows.push(values.join(','));
+        });
+        
+        return csvRows.join('\n');
+    }
+    
+    function downloadFile(content, fileName, contentType) {
+        const blob = new Blob([content], { type: contentType });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+    }
+</script>
+
+<!-- Main Application -->
+            <script type="module" src="src/app.js?v=56"></script>
+</body>
+</html>

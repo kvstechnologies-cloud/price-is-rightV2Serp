@@ -1,0 +1,1174 @@
+/* Compact Professional Audit Dashboard Styles */
+
+/* Audit Dashboard Variables - Compact Design System */
+:root {
+    --audit-primary: #1e293b;
+    --audit-secondary: #334155;
+    --audit-accent: #3b82f6;
+    --audit-success: #10b981;
+    --audit-warning: #f59e0b;
+    --audit-error: #ef4444;
+    --audit-info: #06b6d4;
+    --audit-bg-primary: #ffffff;
+    --audit-bg-secondary: #f8fafc;
+    --audit-bg-tertiary: #f1f5f9;
+    --audit-border: #e2e8f0;
+    --audit-text-primary: #1e293b;
+    --audit-text-secondary: #64748b;
+    --audit-text-muted: #94a3b8;
+    
+    /* Compact Shadow System */
+    --audit-shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+    --audit-shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.06);
+    --audit-shadow-md: 0 2px 4px -1px rgba(0, 0, 0, 0.08);
+    --audit-shadow-lg: 0 4px 8px -2px rgba(0, 0, 0, 0.1);
+    
+    /* Compact Spacing System */
+    --audit-spacing-xs: 8px;
+    --audit-spacing-sm: 12px;
+    --audit-spacing-md: 16px;
+    --audit-spacing-lg: 20px;
+    --audit-spacing-xl: 24px;
+    
+    /* Compact Border Radius */
+    --audit-radius: 10px;
+    --audit-radius-sm: 6px;
+    --audit-radius-pill: 12px;
+}
+
+/* Dark theme overrides for audit dashboard */
+[data-theme="dark"] {
+    --audit-primary: #f8fafc;
+    --audit-secondary: #e2e8f0;
+    --audit-bg-primary: #0f172a;
+    --audit-bg-secondary: #1e293b;
+    --audit-bg-tertiary: #334155;
+    --audit-border: #475569;
+    --audit-text-primary: #f8fafc;
+    --audit-text-secondary: #cbd5e1;
+    --audit-text-muted: #94a3b8;
+}
+
+/* Enhanced Audit Dashboard Layout */
+.audit-dashboard {
+    min-height: 100vh;
+    background: linear-gradient(135deg, var(--audit-bg-primary) 0%, var(--audit-bg-secondary) 100%);
+    padding: 0;
+}
+
+.audit-dashboard .page-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+    background: transparent;
+}
+
+.audit-dashboard .page-header {
+    background: linear-gradient(135deg, var(--audit-accent) 0%, #6366f1 100%);
+    color: white;
+    padding: 3rem 2rem;
+    border-radius: 1rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--audit-shadow-xl);
+    position: relative;
+    overflow: hidden;
+}
+
+.audit-dashboard .page-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+    opacity: 0.3;
+}
+
+.audit-dashboard .page-header h1 {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    position: relative;
+    z-index: 1;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.audit-dashboard .page-header p {
+    font-size: 1.125rem;
+    opacity: 0.9;
+    position: relative;
+    z-index: 1;
+    font-weight: 400;
+}
+
+/* Compact Audit Sections */
+.audit-section {
+    background: var(--audit-bg-primary);
+    border: 1px solid var(--audit-border);
+    border-radius: var(--audit-radius);
+    padding: var(--audit-spacing-sm);
+    margin-bottom: var(--audit-spacing-md);
+    box-shadow: var(--audit-shadow-sm);
+    transition: all 0.2s ease;
+}
+
+.audit-section:hover {
+    box-shadow: var(--audit-shadow-md);
+}
+
+.audit-section h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--audit-text-primary);
+    margin-bottom: var(--audit-spacing-md);
+    display: flex;
+    align-items: center;
+    gap: var(--audit-spacing-xs);
+}
+
+.audit-section h2 i {
+    color: var(--audit-accent);
+    font-size: 1rem;
+}
+
+/* Compact Metrics Grid */
+.audit-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--audit-spacing-md);
+    margin-bottom: 0;
+}
+
+.metric-card {
+    background: var(--audit-bg-primary);
+    border: 1px solid var(--audit-border);
+    border-radius: var(--audit-radius);
+    padding: var(--audit-spacing-md);
+    text-align: center;
+    transition: all 0.2s ease;
+    box-shadow: var(--audit-shadow-xs);
+}
+
+.metric-card:hover {
+    box-shadow: var(--audit-shadow-sm);
+    border-color: var(--audit-accent);
+}
+
+.metric-value {
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: var(--audit-accent);
+    margin-bottom: var(--audit-spacing-xs);
+    line-height: 1;
+}
+
+.metric-value.status-healthy {
+    color: var(--audit-success);
+}
+
+.metric-value.status-error {
+    color: var(--audit-error);
+}
+
+.metric-label {
+    font-size: 0.75rem;
+    color: var(--audit-text-secondary);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Compact Search Controls */
+.search-controls {
+    background: var(--audit-bg-primary);
+    border-radius: var(--audit-radius);
+    padding: var(--audit-spacing-md);
+    margin-bottom: 0;
+    box-shadow: var(--audit-shadow-xs);
+    border: 1px solid var(--audit-border);
+}
+
+.search-row {
+    display: flex;
+    gap: var(--audit-spacing-sm);
+    margin-bottom: var(--audit-spacing-sm);
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.search-row:last-child {
+    margin-bottom: 0;
+}
+
+.search-input {
+    flex: 1;
+    min-width: 250px;
+    padding: var(--audit-spacing-xs) var(--audit-spacing-sm);
+    border: 1px solid var(--audit-border);
+    border-radius: var(--audit-radius-sm);
+    background: var(--audit-bg-secondary);
+    color: var(--audit-text-primary);
+    font-size: 0.875rem;
+    font-weight: 400;
+    transition: all 0.2s ease;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--audit-accent);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+    background: var(--audit-bg-primary);
+}
+
+.filter-select, .date-input {
+    padding: var(--audit-spacing-xs) var(--audit-spacing-sm);
+    border: 1px solid var(--audit-border);
+    border-radius: var(--audit-radius-sm);
+    background: var(--audit-bg-secondary);
+    color: var(--audit-text-primary);
+    font-size: 0.875rem;
+    font-weight: 400;
+    min-width: 120px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.filter-select:focus, .date-input:focus {
+    outline: none;
+    border-color: var(--audit-accent);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+    background: var(--audit-bg-primary);
+}
+
+/* Compact Action Buttons */
+.search-btn, .export-btn, .refresh-btn {
+    padding: var(--audit-spacing-xs) var(--audit-spacing-md);
+    border: none;
+    border-radius: var(--audit-radius-sm);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--audit-spacing-xs);
+    transition: all 0.2s ease;
+}
+
+.search-btn {
+    background: var(--audit-accent);
+    color: white;
+    box-shadow: var(--audit-shadow-xs);
+}
+
+.search-btn:hover {
+    background: #2563eb;
+    box-shadow: var(--audit-shadow-sm);
+}
+
+.export-btn {
+    background: var(--audit-success);
+    color: white;
+    box-shadow: var(--audit-shadow-xs);
+}
+
+.export-btn:hover {
+    background: #059669;
+    box-shadow: var(--audit-shadow-sm);
+}
+
+.refresh-btn {
+    background: var(--audit-info);
+    color: white;
+    box-shadow: var(--audit-shadow-xs);
+}
+
+.refresh-btn:hover {
+    background: #0891b2;
+    box-shadow: var(--audit-shadow-sm);
+}
+
+/* Compact Professional Table Styles */
+.table-container {
+    background: var(--audit-bg-primary);
+    border-radius: var(--audit-radius);
+    overflow: hidden;
+    border: 1px solid var(--audit-border);
+    margin-bottom: var(--audit-spacing-md);
+    box-shadow: var(--audit-shadow-sm);
+}
+
+.audit-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+    background: var(--audit-bg-primary);
+}
+
+.audit-table thead {
+    background: var(--audit-bg-secondary);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.audit-table th {
+    padding: var(--audit-spacing-sm) var(--audit-spacing-md);
+    text-align: left;
+    font-weight: 600;
+    color: var(--audit-text-primary);
+    border-bottom: 1px solid var(--audit-border);
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+    transition: all 0.2s ease;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+.audit-table th.sortable:hover {
+    background: var(--audit-bg-tertiary);
+    color: var(--audit-accent);
+}
+
+.audit-table th i {
+    margin-left: var(--audit-spacing-xs);
+    color: var(--audit-text-secondary);
+    transition: all 0.2s ease;
+    font-size: 0.75rem;
+}
+
+.audit-table th.sortable:hover i {
+    color: var(--audit-accent);
+}
+
+/* Right-align numeric columns */
+.audit-table th:nth-child(5), /* Items */
+.audit-table th:nth-child(6), /* Success Rate */
+.audit-table th:nth-child(7), /* Duration */
+.audit-table td:nth-child(5),
+.audit-table td:nth-child(6),
+.audit-table td:nth-child(7) {
+    text-align: right;
+}
+
+.audit-table td {
+    padding: var(--audit-spacing-sm) var(--audit-spacing-md);
+    border-bottom: 1px solid var(--audit-border);
+    color: var(--audit-text-secondary);
+    font-weight: 400;
+    vertical-align: middle;
+    height: 44px;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.audit-table tbody tr {
+    transition: all 0.15s ease;
+}
+
+.audit-table tbody tr:nth-child(even) {
+    background: rgba(248, 250, 252, 0.5);
+}
+
+.audit-table tbody tr:hover {
+    background: rgba(59, 130, 246, 0.08);
+    box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.2);
+}
+
+.audit-table tbody tr:hover td {
+    color: var(--audit-text-primary);
+}
+
+/* Compact Job Type Badges - XS Pill Design */
+.job-type-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: var(--audit-radius-pill);
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    height: 22px;
+    line-height: 1;
+    transition: all 0.2s ease;
+}
+
+.job-type-badge.type-csv {
+    background: var(--audit-success);
+    color: white;
+}
+
+.job-type-badge.type-excel {
+    background: var(--audit-accent);
+    color: white;
+}
+
+.job-type-badge.type-image {
+    background: var(--audit-warning);
+    color: white;
+}
+
+.job-type-badge.type-single {
+    background: var(--audit-info);
+    color: white;
+}
+
+.job-type-badge.type-unknown {
+    background: var(--audit-text-muted);
+    color: white;
+}
+
+/* Compact Status Badges - XS Pill Design */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: var(--audit-radius-pill);
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    height: 22px;
+    line-height: 1;
+    transition: all 0.2s ease;
+}
+
+.status-badge.status-success {
+    background: var(--audit-success);
+    color: white;
+}
+
+.status-badge.status-error {
+    background: var(--audit-error);
+    color: white;
+}
+
+.status-badge.status-processing {
+    background: var(--audit-warning);
+    color: white;
+    animation: pulse 2s infinite;
+}
+
+.status-badge.status-partial_success {
+    background: #8b5cf6;
+    color: white;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+/* Enhanced Action Buttons */
+.action-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    position: relative;
+    overflow: hidden;
+}
+
+.action-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: left 0.5s ease;
+}
+
+.action-btn:hover::before {
+    left: 100%;
+}
+
+.view-btn {
+    background: linear-gradient(135deg, var(--audit-accent), #2563eb);
+    color: white;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.view-btn:hover {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.view-btn:disabled {
+    background: linear-gradient(135deg, var(--audit-text-muted), #9ca3af);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Page Size Selector */
+.page-size-selector {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem;
+    background: var(--audit-bg-secondary);
+    border-radius: 0.75rem;
+    border: 1px solid var(--audit-border);
+    margin-bottom: 1rem;
+}
+
+.page-size-selector label {
+    font-size: 0.875rem;
+    color: var(--audit-text-secondary);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.page-size-selector select {
+    padding: 0.5rem 0.75rem;
+    border: 2px solid var(--audit-border);
+    border-radius: 0.5rem;
+    background: var(--audit-bg-primary);
+    color: var(--audit-text-primary);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 80px;
+}
+
+.page-size-selector select:hover {
+    border-color: var(--audit-accent);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+}
+
+.page-size-selector select:focus {
+    outline: none;
+    border-color: var(--audit-accent);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+/* Enhanced Pagination */
+.pagination {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1rem;
+    padding: 1.5rem;
+    background: var(--audit-bg-secondary);
+    border-radius: 1rem;
+    border: 1px solid var(--audit-border);
+}
+
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.pagination-btn {
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--audit-border);
+    background: var(--audit-bg-primary);
+    color: var(--audit-text-primary);
+    border-radius: 0.5rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.pagination-btn:hover:not(:disabled) {
+    background: var(--audit-accent);
+    color: white;
+    border-color: var(--audit-accent);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.pagination-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: var(--audit-bg-tertiary);
+    color: var(--audit-text-muted);
+}
+
+.pagination-page.current {
+    padding: 0.75rem 1rem;
+    background: linear-gradient(135deg, var(--audit-accent), #2563eb);
+    color: white;
+    border-radius: 0.5rem;
+    font-weight: 700;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.pagination-info {
+    color: var(--audit-text-secondary);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+/* Enhanced Job Details Modal */
+#job-details-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 1rem;
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    animation: modalFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#job-details-modal .modal-content {
+    background: var(--audit-bg-primary);
+    border-radius: 1.5rem;
+    max-width: 900px !important;
+    width: 95% !important;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 
+        0 32px 64px -12px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+    border: 1px solid var(--audit-border);
+    position: relative;
+    transform: scale(0.95);
+    animation: modalSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+#job-details-modal .modal-header {
+    background: linear-gradient(135deg, var(--audit-accent) 0%, #6366f1 100%);
+    padding: 2rem;
+    border-bottom: 1px solid var(--audit-border);
+    border-radius: 1.5rem 1.5rem 0 0;
+    position: relative;
+    overflow: hidden;
+}
+
+#job-details-modal .modal-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M 8 0 L 0 0 0 8" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+    opacity: 0.3;
+}
+
+#job-details-modal .modal-header h3 {
+    color: white !important;
+    font-size: 2rem !important;
+    font-weight: 800 !important;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    position: relative;
+    z-index: 1;
+}
+
+#job-details-modal .modal-header h3 i {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 1.5rem;
+}
+
+#job-details-modal .modal-close {
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    cursor: pointer;
+    padding: 0.75rem;
+    border-radius: 50%;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    position: absolute;
+    top: 1.5rem;
+    right: 1.5rem;
+    z-index: 2;
+}
+
+#job-details-modal .modal-close:hover {
+    background: rgba(239, 68, 68, 0.9);
+    border-color: #ef4444;
+    transform: scale(1.1) rotate(90deg);
+    box-shadow: 0 8px 16px rgba(239, 68, 68, 0.4);
+}
+
+#job-details-modal .modal-body {
+    padding: var(--audit-spacing-md);
+    background: var(--audit-bg-primary);
+}
+
+/* Compact Job Details Grid - Two Column Layout on md+ */
+.job-details-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--audit-spacing-sm);
+    margin-bottom: var(--audit-spacing-md);
+}
+
+@media (min-width: 768px) {
+    .job-details-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: var(--audit-spacing-md);
+    }
+}
+
+.detail-item {
+    background: var(--audit-bg-secondary);
+    border: 1px solid var(--audit-border);
+    border-radius: var(--audit-radius);
+    padding: var(--audit-spacing-sm);
+    transition: all 0.2s ease;
+}
+
+.detail-item:hover {
+    box-shadow: var(--audit-shadow-sm);
+    border-color: var(--audit-accent);
+}
+
+.detail-item label {
+    font-weight: 600;
+    color: var(--audit-text-secondary);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: var(--audit-spacing-xs);
+    margin-bottom: var(--audit-spacing-xs);
+}
+
+.detail-item label i {
+    color: var(--audit-accent);
+    font-size: 0.875rem;
+    width: 14px;
+    text-align: center;
+}
+
+.detail-value {
+    color: var(--audit-text-primary);
+    font-size: 1rem;
+    font-weight: 500;
+    word-break: break-word;
+    line-height: 1.3;
+}
+
+/* Enhanced Success Rate Indicators */
+.success-rate {
+    font-weight: 700;
+    padding: 0.5rem 1rem;
+    border-radius: 2rem;
+    font-size: 0.875rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.success-rate.high {
+    background: linear-gradient(135deg, var(--audit-success), #059669);
+    color: white;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.success-rate.medium {
+    background: linear-gradient(135deg, var(--audit-warning), #d97706);
+    color: white;
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.success-rate.low {
+    background: linear-gradient(135deg, var(--audit-error), #dc2626);
+    color: white;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+/* Compact Job Notes Section */
+.job-notes-section {
+    background: var(--audit-bg-secondary);
+    border-radius: var(--audit-radius);
+    padding: var(--audit-spacing-sm);
+    margin: var(--audit-spacing-md) 0;
+    border: 1px solid var(--audit-border);
+    box-shadow: var(--audit-shadow-xs);
+}
+
+.job-notes-section h4 {
+    margin: 0 0 var(--audit-spacing-xs) 0;
+    color: var(--audit-text-primary);
+    font-size: 1rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: var(--audit-spacing-xs);
+}
+
+.job-notes-section h4 i {
+    color: var(--audit-accent);
+}
+
+.notes-content {
+    background: var(--audit-bg-primary);
+    padding: var(--audit-spacing-sm);
+    border-radius: var(--audit-radius-sm);
+    border: 1px solid var(--audit-border);
+}
+
+.notes-content p {
+    margin: 0;
+    color: var(--audit-text-primary);
+    line-height: 1.4;
+    font-size: 0.875rem;
+}
+
+/* Compact Modal Actions */
+.modal-actions {
+    display: flex;
+    justify-content: center;
+    gap: var(--audit-spacing-sm);
+    margin-top: var(--audit-spacing-md);
+    padding-top: var(--audit-spacing-sm);
+    border-top: 1px solid var(--audit-border);
+    background: var(--audit-bg-secondary);
+    margin: var(--audit-spacing-md) calc(-1 * var(--audit-spacing-md)) 0;
+    padding: var(--audit-spacing-sm) var(--audit-spacing-md);
+    border-radius: 0 0 1.5rem 1.5rem;
+}
+
+.modal-actions .btn {
+    padding: var(--audit-spacing-xs) var(--audit-spacing-md);
+    border-radius: var(--audit-radius-sm);
+    font-weight: 500;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--audit-spacing-xs);
+    min-width: 100px;
+    justify-content: center;
+}
+
+.modal-actions .btn-primary {
+    background: var(--audit-accent);
+    color: white;
+    border-color: var(--audit-accent);
+    box-shadow: var(--audit-shadow-xs);
+}
+
+.modal-actions .btn-primary:hover {
+    background: #2563eb;
+    border-color: #2563eb;
+    box-shadow: var(--audit-shadow-sm);
+}
+
+.modal-actions .btn-secondary {
+    background: var(--audit-bg-primary);
+    color: var(--audit-text-primary);
+    border-color: var(--audit-border);
+    box-shadow: var(--audit-shadow-xs);
+}
+
+.modal-actions .btn-secondary:hover {
+    background: var(--audit-bg-tertiary);
+    border-color: var(--audit-accent);
+    box-shadow: var(--audit-shadow-sm);
+}
+
+.download-btn {
+    background: var(--audit-success);
+    color: white;
+    border: none;
+    padding: var(--audit-spacing-xs) var(--audit-spacing-md);
+    border-radius: var(--audit-radius-sm);
+    font-weight: 500;
+    font-size: 0.875rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--audit-spacing-xs);
+    transition: all 0.2s ease;
+    text-decoration: none;
+    box-shadow: var(--audit-shadow-xs);
+}
+
+.download-btn:hover {
+    background: #059669;
+    box-shadow: var(--audit-shadow-sm);
+}
+
+/* Loading States */
+.loading-cell, .no-data, .error-cell {
+    text-align: center;
+    padding: 2rem;
+    color: var(--audit-text-secondary);
+    font-style: italic;
+    font-size: 1rem;
+}
+
+.error-cell {
+    color: var(--audit-error);
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .audit-dashboard .page-container {
+        padding: 1.5rem;
+    }
+    
+    .audit-metrics {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+    
+    .job-details-grid {
+        grid-template-columns: 1fr !important;
+        gap: 1rem !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .audit-dashboard .page-container {
+        padding: 1rem;
+    }
+    
+    .audit-dashboard .page-header {
+        padding: 2rem 1.5rem;
+        text-align: center;
+    }
+    
+    .audit-dashboard .page-header h1 {
+        font-size: 2rem;
+    }
+    
+    .audit-metrics {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+    }
+    
+    .metric-card {
+        padding: 1.5rem;
+    }
+    
+    .metric-value {
+        font-size: 2rem;
+    }
+    
+    .search-controls {
+        padding: 1.5rem;
+    }
+    
+    .search-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+    }
+    
+    .search-input, .filter-select, .date-input {
+        min-width: auto;
+        width: 100%;
+    }
+    
+    .table-container {
+        overflow-x: auto;
+    }
+    
+    .audit-table {
+        min-width: 800px;
+    }
+    
+    .audit-table th, .audit-table td {
+        padding: 0.75rem 0.5rem;
+        font-size: 0.75rem;
+    }
+    
+    #job-details-modal {
+        padding: 0.5rem;
+    }
+    
+    #job-details-modal .modal-content {
+        max-width: 95vw !important;
+        width: 95vw !important;
+        max-height: 95vh;
+    }
+    
+    #job-details-modal .modal-header {
+        padding: 1.5rem;
+    }
+    
+    #job-details-modal .modal-header h3 {
+        font-size: 1.5rem !important;
+    }
+    
+    #job-details-modal .modal-body {
+        padding: 1.5rem;
+    }
+    
+    .detail-item {
+        padding: 1rem;
+    }
+    
+    .modal-actions {
+        flex-direction: column;
+        gap: 0.75rem;
+        padding: 1.5rem;
+        margin: 1.5rem -1.5rem 0;
+    }
+    
+    .modal-actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .audit-metrics {
+        grid-template-columns: 1fr;
+    }
+    
+    .metric-card {
+        padding: 1rem;
+    }
+    
+    .metric-value {
+        font-size: 1.75rem;
+    }
+    
+    .search-controls {
+        padding: 1rem;
+    }
+    
+    .audit-table {
+        min-width: 600px;
+    }
+    
+    .audit-table th, .audit-table td {
+        padding: 0.5rem 0.25rem;
+        font-size: 0.7rem;
+    }
+    
+    .job-type-badge, .status-badge {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.65rem;
+    }
+    
+    .action-btn {
+        padding: 0.375rem 0.75rem;
+        font-size: 0.65rem;
+    }
+}
+
+/* Animation Keyframes */
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes modalSlideIn {
+    from {
+        transform: scale(0.95) translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes modalFadeOut {
+    from {
+        opacity: 1;
+        transform: scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+}
+
+/* Error Modal Specific Styles */
+.error-modal .modal-content {
+    border-color: var(--audit-error);
+    box-shadow: 
+        0 32px 64px -12px rgba(239, 68, 68, 0.3),
+        0 0 0 1px rgba(239, 68, 68, 0.1) inset;
+}
+
+.error-modal .modal-header {
+    background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+    border-bottom-color: #fecaca;
+}
+
+.error-modal .modal-header::before {
+    background: linear-gradient(90deg, var(--audit-error), #dc2626, var(--audit-error));
+}
+
+.error-modal .modal-header h3 {
+    color: #991b1b !important;
+}
+
+.error-modal .modal-header h3 i {
+    color: var(--audit-error) !important;
+}
+
+.error-message {
+    color: #991b1b;
+    background: linear-gradient(135deg, #fef2f2, #fee2e2);
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+    border: 1px solid #fecaca;
+    font-weight: 600;
+    font-size: 1rem;
+    text-align: center;
+    margin: 1rem 0;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Error Icon */
+.error-icon {
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.error-icon i {
+    font-size: 3rem;
+    color: var(--audit-error);
+    opacity: 0.8;
+}

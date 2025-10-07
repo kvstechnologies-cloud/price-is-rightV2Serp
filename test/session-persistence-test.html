@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Session Persistence Test</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status { 
+            padding: 10px; 
+            margin: 10px 0; 
+            border-radius: 5px; 
+        }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Session Persistence Test</h1>
+        <p>This test verifies that authentication state persists across page refreshes.</p>
+        
+        <div class="test-section">
+            <h2>Current Authentication Status</h2>
+            <div id="auth-status"></div>
+            <button onclick="checkAuthStatus()">Check Auth Status</button>
+            <button onclick="clearAuth()">Clear Auth</button>
+            <button onclick="simulateLogin()">Simulate Login</button>
+        </div>
+
+        <div class="test-section">
+            <h2>localStorage Contents</h2>
+            <div id="localstorage-content"></div>
+            <button onclick="showLocalStorage()">Show localStorage</button>
+        </div>
+
+        <div class="test-section">
+            <h2>Test Instructions</h2>
+            <ol>
+                <li>Click "Simulate Login" to create a test authentication</li>
+                <li>Verify that the auth status shows as authenticated</li>
+                <li>Refresh the page (F5 or Ctrl+R)</li>
+                <li>Check if the authentication status persists</li>
+                <li>If it persists, the session persistence is working!</li>
+            </ol>
+        </div>
+
+        <div class="test-section">
+            <h2>Test Results</h2>
+            <div id="test-results"></div>
+        </div>
+    </div>
+
+    <script>
+        function addStatus(containerId, message, type = 'info') {
+            const container = document.getElementById(containerId);
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.innerHTML = message;
+            container.appendChild(div);
+        }
+
+        function checkAuthStatus() {
+            const statusContainer = document.getElementById('auth-status');
+            statusContainer.innerHTML = '<div class="status info">Checking authentication status...</div>';
+
+            const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+            const userEmail = localStorage.getItem('userEmail');
+            const authTimestamp = localStorage.getItem('authTimestamp');
+
+            if (isAuthenticated && userEmail && authTimestamp) {
+                const timestamp = new Date(parseInt(authTimestamp));
+                const now = new Date();
+                const timeDiff = now - timestamp;
+                const hoursDiff = timeDiff / (1000 * 60 * 60);
+
+                if (hoursDiff < 24) {
+                    addStatus('auth-status', `✅ User is authenticated: ${userEmail}<br>Authenticated at: ${timestamp.toLocaleString()}<br>Hours since login: ${hoursDiff.toFixed(2)}`, 'success');
+                } else {
+                    addStatus('auth-status', `⚠️ Authentication expired: ${userEmail}<br>Authenticated at: ${timestamp.toLocaleString()}<br>Hours since login: ${hoursDiff.toFixed(2)}`, 'warning');
+                }
+            } else {
+                addStatus('auth-status', '❌ User is not authenticated', 'error');
+            }
+        }
+
+        function clearAuth() {
+            localStorage.removeItem('isAuthenticated');
+            localStorage.removeItem('userEmail');
+            localStorage.removeItem('authTimestamp');
+            addStatus('auth-status', '🗑️ Authentication cleared from localStorage', 'info');
+            showLocalStorage();
+        }
+
+        function simulateLogin() {
+            const testEmail = 'test@example.com';
+            localStorage.setItem('isAuthenticated', 'true');
+            localStorage.setItem('userEmail', testEmail);
+            localStorage.setItem('authTimestamp', Date.now().toString());
+            
+            addStatus('auth-status', `✅ Simulated login for: ${testEmail}`, 'success');
+            showLocalStorage();
+        }
+
+        function showLocalStorage() {
+            const container = document.getElementById('localstorage-content');
+            const authData = {
+                isAuthenticated: localStorage.getItem('isAuthenticated'),
+                userEmail: localStorage.getItem('userEmail'),
+                authTimestamp: localStorage.getItem('authTimestamp')
+            };
+            
+            container.innerHTML = `<pre>${JSON.stringify(authData, null, 2)}</pre>`;
+        }
+
+        // Auto-check on page load
+        window.addEventListener('load', () => {
+            checkAuthStatus();
+            showLocalStorage();
+        });
+
+        // Test if session persists on page load
+        if (localStorage.getItem('isAuthenticated') === 'true') {
+            addStatus('test-results', '✅ Session persistence test: Authentication state persisted across page refresh!', 'success');
+        } else {
+            addStatus('test-results', 'ℹ️ No authentication state found. Use "Simulate Login" to test persistence.', 'info');
+        }
+    </script>
+</body>
+</html>

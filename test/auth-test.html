@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authentication Test - Insurance Pricing System</title>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="../styles/main.css">
+    <link rel="stylesheet" href="../styles/auth.css">
+</head>
+<body>
+    <div id="auth-container"></div>
+
+    <!-- Test Script -->
+    <script type="module">
+        import { AuthComponent } from '../js/components/AuthComponent.js';
+        import { appConfig } from '../client/src/config/app-config.js';
+
+        // App configuration loaded
+        console.log('App configuration loaded:', appConfig);
+
+        // Initialize authentication component
+        const authContainer = document.getElementById('auth-container');
+        const authComponent = new AuthComponent(authContainer);
+
+        // Add some test functionality
+        window.testAuth = {
+            getStatus: () => {
+                const status = authComponent.getAuthStatus();
+                console.log('Auth Status:', status);
+                return status;
+            },
+            simulateLogin: () => {
+                // This will only work in development mode
+                console.log('Simulating login...');
+                authComponent.currentUser = { attributes: { email: 'test@example.com' } };
+                authComponent.isAuthenticated = true;
+                authComponent.render();
+            }
+        };
+
+        console.log('Authentication test page loaded');
+        console.log('Use window.testAuth.getStatus() to check authentication status');
+        console.log('Use window.testAuth.simulateLogin() to simulate login (development mode)');
+    </script>
+</body>
+</html> 
