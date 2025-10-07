@@ -1,5 +1,14 @@
 import { Request } from 'express';
 
+// Extend Express Request interface to include user
+declare global {
+  namespace Express {
+    interface Request {
+      user?: any;
+    }
+  }
+}
+
 // Environment variables
 const AUDIT_ENABLED = process.env.AUDIT_ENABLED === 'true';
 

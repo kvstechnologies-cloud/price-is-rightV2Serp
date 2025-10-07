@@ -17,7 +17,7 @@ const DB_POOL_MAX = parseInt(process.env.DB_POOL_MAX || '3');
 const AUDIT_ENABLED = process.env.AUDIT_ENABLED === 'true';
 
 let pool: mysql.Pool | null = null;
-let db: ReturnType<typeof drizzle> | null = null;
+let db: any = null;
 
 /**
  * Initialize database connection
@@ -46,10 +46,10 @@ export async function initializeDatabase(): Promise<boolean> {
       waitForConnections: true,
       connectionLimit: DB_POOL_MAX,
       queueLimit: 0,
-      acquireTimeout: 10000, // 10 seconds
+      // acquireTimeout: 10000, // 10 seconds - not supported in mysql2
       timeout: 60000, // 60 seconds
       reconnect: true,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
     });
 
     // Test connection
@@ -58,7 +58,10 @@ export async function initializeDatabase(): Promise<boolean> {
     connection.release();
 
     // Initialize Drizzle
-    db = drizzle(pool, { schema: { users, files, jobs, jobItems, searchEvents, finalChoices, auditLogs } });
+    db = drizzle(pool, { 
+      schema: { users, files, jobs, jobItems, searchEvents, finalChoices, auditLogs },
+      mode: 'default'
+    });
 
     console.log('✅ Audit database connected successfully');
     console.log(`📊 Pool config: min=${DB_POOL_MIN}, max=${DB_POOL_MAX}`);

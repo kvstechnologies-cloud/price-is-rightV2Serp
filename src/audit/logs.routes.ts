@@ -156,7 +156,7 @@ router.get('/jobs/:jobId', requireAuditEnabled, requireAuth, async (req: Request
     // Get job details
     const jobDetails = await db.select()
       .from(jobs)
-      .where(and(eq(jobs.id, jobId), eq(jobs.userId, user.id))
+      .where(and(eq(jobs.id, jobId), eq(jobs.userId, user.id)))
       .limit(1);
 
     if (jobDetails.length === 0) {
