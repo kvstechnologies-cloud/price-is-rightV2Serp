@@ -6,78 +6,91 @@
 
 class PriceToleranceValidator {
   constructor() {
-    this.defaultTolerance = 10; // 10% default tolerance
-    this.maxTolerance = 50; // 50% maximum allowed tolerance
+    // Remove hardcoded tolerance values - use only user-selected tolerance
     this.minPrice = 1.0; // Minimum price floor
     this.maxPrice = 50000; // Maximum reasonable price
-    
-    // Category-specific tolerance rules
-    this.categoryTolerances = {
-      'Electronics': { min: 5, max: 30, typical: 15 },
-      'Appliances': { min: 10, max: 40, typical: 20 },
-      'Furniture': { min: 15, max: 50, typical: 25 },
-      'Tools': { min: 5, max: 25, typical: 12 },
-      'Kitchen': { min: 8, max: 35, typical: 18 },
-      'Bathroom': { min: 10, max: 40, typical: 20 },
-      'Office': { min: 5, max: 30, typical: 15 },
-      'Storage': { min: 15, max: 45, typical: 25 },
-      'General': { min: 10, max: 40, typical: 20 }
-    };
   }
 
   /**
-   * Validate price against tolerance and compliance rules
+   * Validate price against tolerance and compliance rules - STRICT MODE
    * @param {Object} result - Pricing result from pipeline
    * @param {number} targetPrice - Original/expected price
-   * @param {number} tolerance - Tolerance percentage (optional)
+   * @param {number} tolerance - Tolerance percentage (REQUIRED)
    * @param {Object} facts - Product facts for context
    * @returns {Object} Validation result with compliance status
    */
   validatePrice(result, targetPrice, tolerance = null, facts = {}) {
-    console.log('🔍 PRICE VALIDATION: Starting validation', {
+    console.log('🔍 STRICT PRICE VALIDATION: Starting validation', {
       resultPrice: result.adjustedPrice,
       targetPrice,
       tolerance,
-      category: facts.category
+      category: facts.category,
+      strictMode: true
     });
 
     const validation = {
-      isValid: true,
-      isCompliant: true,
-      withinTolerance: true,
+      isValid: false, // Start as invalid - must prove validity
+      isCompliant: false, // Start as non-compliant - must prove compliance
+      withinTolerance: false, // Start as outside tolerance - must prove within range
       warnings: [],
       errors: [],
       adjustments: [],
       finalPrice: result.adjustedPrice,
-      confidence: result.confidence || 0.5
+      confidence: 0.0, // Start with no confidence - must earn it
+      requiresManualReview: true // Start requiring review - must prove otherwise
     };
 
     // Step 1: Basic price validation
     const basicValidation = this.validateBasicPrice(result.adjustedPrice);
     if (!basicValidation.isValid) {
-      validation.isValid = false;
       validation.errors.push(...basicValidation.errors);
       
-      // Apply emergency correction
-      validation.finalPrice = Math.max(this.minPrice, targetPrice || 50);
-      validation.adjustments.push(`Emergency price correction: $${validation.finalPrice}`);
+      // For strict validation, we need to be more careful about price corrections
+      // Only apply emergency correction if price is completely invalid (NaN, null, etc.)
+      if (!result.adjustedPrice || isNaN(result.adjustedPrice)) {
+        validation.finalPrice = Math.max(this.minPrice, targetPrice || 50);
+        validation.adjustments.push(`Emergency price correction: $${validation.finalPrice}`);
+      } else {
+        // If price is valid but outside min/max range, still use it for tolerance checking
+        validation.finalPrice = result.adjustedPrice;
+        validation.warnings.push(`Price $${result.adjustedPrice} is outside recommended range but will be checked against tolerance`);
+      }
+    } else {
+      validation.finalPrice = result.adjustedPrice;
     }
 
-    // Step 2: Tolerance validation (if target price provided)
-    if (targetPrice && targetPrice > 0) {
-      const toleranceValidation = this.validateTolerance(
-        validation.finalPrice, 
-        targetPrice, 
-        tolerance, 
-        facts.category
-      );
-      
-      validation.withinTolerance = toleranceValidation.withinTolerance;
-      validation.warnings.push(...toleranceValidation.warnings);
-      
-      if (!toleranceValidation.withinTolerance) {
-        validation.confidence *= 0.7; // Reduce confidence for out-of-tolerance prices
-      }
+    // Step 2: STRICT Tolerance validation - REQUIRED
+    if (!tolerance || tolerance <= 0) {
+      validation.errors.push('Tolerance is required for strict validation');
+      validation.isValid = false;
+      validation.isCompliant = false;
+      return validation; // IMMEDIATE REJECTION
+    }
+
+    if (!targetPrice || targetPrice <= 0) {
+      validation.errors.push('Target price is required for strict validation');
+      validation.isValid = false;
+      validation.isCompliant = false;
+      return validation; // IMMEDIATE REJECTION
+    }
+
+    const toleranceValidation = this.validateTolerance(
+      validation.finalPrice, 
+      targetPrice, 
+      tolerance, 
+      facts.category
+    );
+    
+    validation.withinTolerance = toleranceValidation.withinTolerance;
+    validation.warnings.push(...toleranceValidation.warnings);
+    validation.errors.push(...toleranceValidation.errors);
+
+    // STRICT: If not within tolerance, REJECT IMMEDIATELY
+    if (!toleranceValidation.withinTolerance) {
+      validation.isValid = false;
+      validation.isCompliant = false;
+      validation.errors.push('REJECTED: Price is outside tolerance range');
+      return validation; // IMMEDIATE REJECTION
     }
 
     // Step 3: Category-specific validation
@@ -93,10 +106,21 @@ class PriceToleranceValidator {
     validation.warnings.push(...tierValidation.warnings);
     validation.confidence = Math.min(validation.confidence, tierValidation.maxConfidence);
 
-    // Step 5: Final compliance check
-    validation.isCompliant = validation.isValid && 
-                           validation.errors.length === 0 && 
-                           validation.finalPrice >= this.minPrice;
+    // Step 5: STRICT Final compliance check
+    // For strict tolerance validation, the ONLY requirement is that the price is within tolerance
+    // Other validation errors (like min/max price) are warnings, not rejection criteria
+    validation.isCompliant = validation.withinTolerance;
+
+    // If within tolerance, approve regardless of other validation issues
+    if (validation.withinTolerance) {
+      validation.isValid = true;
+      validation.confidence = 1.0;
+      validation.requiresManualReview = false;
+      validation.warnings.push('APPROVED: Price passed strict tolerance validation');
+    } else {
+      validation.isValid = false;
+      validation.errors.push('REJECTED: Price is outside tolerance range');
+    }
 
     console.log('✅ PRICE VALIDATION: Complete', {
       isValid: validation.isValid,
@@ -137,55 +161,54 @@ class PriceToleranceValidator {
   }
 
   /**
-   * Validate price against tolerance thresholds
+   * Validate price against tolerance thresholds - STRICT MODE
+   * NO PRICE OUTSIDE THE CALCULATED RANGE WILL BE APPROVED
    */
   validateTolerance(price, targetPrice, tolerance, category) {
-    const validation = { withinTolerance: true, warnings: [] };
+    const validation = { withinTolerance: false, warnings: [], errors: [] };
 
-    // Determine effective tolerance
-    let effectiveTolerance = tolerance || this.defaultTolerance;
-    
-    // Apply category-specific tolerance if available
-    if (category && this.categoryTolerances[category]) {
-      const categoryTolerance = this.categoryTolerances[category].typical;
-      if (!tolerance) {
-        effectiveTolerance = categoryTolerance;
-      }
+    // Use only the provided tolerance - no defaults or fallbacks
+    if (!tolerance || tolerance <= 0) {
+      validation.errors.push('No tolerance specified - cannot validate price range');
+      validation.withinTolerance = false;
+      return validation;
     }
 
-    // Ensure tolerance is within reasonable bounds
-    effectiveTolerance = Math.min(effectiveTolerance, this.maxTolerance);
+    if (!targetPrice || targetPrice <= 0) {
+      validation.errors.push('No target price specified - cannot validate price range');
+      validation.withinTolerance = false;
+      return validation;
+    }
 
-    // Calculate tolerance range
+    const effectiveTolerance = tolerance;
+
+    // Calculate STRICT tolerance range
     const lowerBound = targetPrice * (1 - effectiveTolerance / 100);
     const upperBound = targetPrice * (1 + effectiveTolerance / 100);
 
-    console.log('🔍 TOLERANCE CHECK:', {
+    console.log('🔍 STRICT TOLERANCE CHECK:', {
       price,
       targetPrice,
       effectiveTolerance,
       lowerBound,
       upperBound,
-      category
+      category,
+      strictMode: true
     });
 
-    // Check if within tolerance
+    // STRICT VALIDATION: Price MUST be within the exact range
     if (price < lowerBound || price > upperBound) {
       validation.withinTolerance = false;
       const deviation = Math.abs(((price - targetPrice) / targetPrice) * 100);
-      validation.warnings.push(
-        `Price $${price} is ${deviation.toFixed(1)}% away from target $${targetPrice} (tolerance: ±${effectiveTolerance}%)`
+      validation.errors.push(
+        `REJECTED: Price $${price} is outside tolerance range. Required: $${lowerBound.toFixed(2)} - $${upperBound.toFixed(2)} (deviation: ${deviation.toFixed(1)}%)`
       );
+      return validation; // IMMEDIATE REJECTION - no further processing
     }
 
-    // Additional warnings for extreme deviations
-    if (price < targetPrice * 0.5) {
-      validation.warnings.push('Price is significantly lower than expected - verify product match');
-    }
-    
-    if (price > targetPrice * 2) {
-      validation.warnings.push('Price is significantly higher than expected - consider alternatives');
-    }
+    // If we reach here, price is within range
+    validation.withinTolerance = true;
+    validation.warnings.push(`APPROVED: Price $${price} is within tolerance range $${lowerBound.toFixed(2)} - $${upperBound.toFixed(2)}`);
 
     return validation;
   }
@@ -277,15 +300,6 @@ class PriceToleranceValidator {
     return validation;
   }
 
-  /**
-   * Get recommended tolerance for a category
-   */
-  getRecommendedTolerance(category) {
-    if (category && this.categoryTolerances[category]) {
-      return this.categoryTolerances[category].typical;
-    }
-    return this.defaultTolerance;
-  }
 
   /**
    * Check if price requires manual review
@@ -391,4 +405,4 @@ class PriceToleranceValidator {
   }
 }
 
-module.exports = { PriceToleranceValidator };
+module.exports = PriceToleranceValidator;

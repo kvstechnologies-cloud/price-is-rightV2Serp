@@ -16,7 +16,11 @@ class APIHelper {
     }
 
     // Process CSV/Excel files
-    async processCSVFile(file, tolerance = 10) {
+    async processCSVFile(file, tolerance) {
+      // Use only the provided tolerance - no defaults
+      if (!tolerance || tolerance <= 0) {
+        throw new Error('Tolerance percentage is required and must be greater than 0');
+      }
         const formData = new FormData();
         formData.append('csvFile', file);
         formData.append('tolerance', tolerance.toString());
@@ -158,7 +162,11 @@ Example response:
     }
 
     // Process multiple files of different types
-    async processMultipleFiles(files, tolerance = 10) {
+    async processMultipleFiles(files, tolerance) {
+      // Use only the provided tolerance - no defaults
+      if (!tolerance || tolerance <= 0) {
+        throw new Error('Tolerance percentage is required and must be greater than 0');
+      }
         const results = [];
         const errors = [];
 

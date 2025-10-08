@@ -47,8 +47,8 @@ export async function initializeDatabase(): Promise<boolean> {
       connectionLimit: DB_POOL_MAX,
       queueLimit: 0,
       // acquireTimeout: 10000, // 10 seconds - not supported in mysql2
-      timeout: 60000, // 60 seconds
-      reconnect: true,
+      // timeout: 60000, // 60 seconds - REMOVED (not supported in mysql2)
+      // reconnect: true, // REMOVED (not supported in mysql2)
       ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
     });
 

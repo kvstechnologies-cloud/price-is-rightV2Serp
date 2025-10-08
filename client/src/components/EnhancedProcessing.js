@@ -29,6 +29,7 @@ export class EnhancedProcessing {
         setTimeout(() => {
             this.bindEvents();
             this.setupModals();
+            this.setupPriceRangeDisplay();
         }, 100);
         
         // Also try to bind events when the enhanced results section becomes visible
@@ -46,6 +47,72 @@ export class EnhancedProcessing {
         }
 
         console.log('✅ Enhanced Processing basic events bound');
+    }
+
+    setupPriceRangeDisplay() {
+        // Add price range display functionality
+        const toleranceInput = document.getElementById('priceTolerance');
+        if (toleranceInput) {
+            // Check if price range display already exists to prevent duplicates
+            let priceRangeDisplay = document.getElementById('priceRangeDisplay');
+            
+            if (!priceRangeDisplay) {
+                // Create price range display element only if it doesn't exist
+                priceRangeDisplay = document.createElement('div');
+                priceRangeDisplay.id = 'priceRangeDisplay';
+                priceRangeDisplay.className = 'price-range-display';
+                priceRangeDisplay.style.cssText = `
+                    margin-top: 10px;
+                    padding: 10px;
+                    background-color: #f8f9fa;
+                    border: 1px solid #dee2e6;
+                    border-radius: 5px;
+                    font-size: 14px;
+                    color: #495057;
+                `;
+                
+                // Insert after tolerance input
+                toleranceInput.parentNode.insertBefore(priceRangeDisplay, toleranceInput.nextSibling);
+            }
+            
+            // Add event listener for tolerance changes (only if not already added)
+            if (!toleranceInput.hasAttribute('data-range-listener-added')) {
+                toleranceInput.addEventListener('input', () => {
+                    this.updatePriceRangeDisplay();
+                });
+                toleranceInput.setAttribute('data-range-listener-added', 'true');
+            }
+            
+            // Initial update
+            this.updatePriceRangeDisplay();
+        }
+    }
+
+    updatePriceRangeDisplay() {
+        const toleranceInput = document.getElementById('priceTolerance');
+        const priceRangeDisplay = document.getElementById('priceRangeDisplay');
+        
+        if (!toleranceInput || !priceRangeDisplay) return;
+        
+        const tolerance = parseInt(toleranceInput.value);
+        
+        if (tolerance && tolerance > 0) {
+            // Show example calculation
+            const examplePrice = 100; // Use $100 as example
+            const minPrice = examplePrice * (1 - tolerance / 100);
+            const maxPrice = examplePrice * (1 + tolerance / 100);
+            
+            priceRangeDisplay.innerHTML = `
+                <strong>📊 Price Range Preview:</strong><br>
+                For a $${examplePrice} item with ${tolerance}% tolerance:<br>
+                <span style="color: #28a745; font-weight: bold;">$${minPrice.toFixed(2)} - $${maxPrice.toFixed(2)}</span><br>
+                <small style="color: #6c757d;">This range will be used to search for replacement items</small>
+            `;
+        } else {
+            priceRangeDisplay.innerHTML = `
+                <span style="color: #dc3545;">⚠️ Please select a valid tolerance percentage</span>
+            `;
+        }
     }
 
     bindResultsEvents() {
@@ -669,7 +736,11 @@ export class EnhancedProcessing {
             // Show processing message
             this.app.showLoading('🔄 Processing your inventory with ENHANCED AI pricing... This may take several minutes for large files.');
             
-            const tolerancePct = parseInt(document.getElementById('priceTolerance')?.value || '50');
+            const tolerancePct = parseInt(document.getElementById('priceTolerance')?.value);
+            if (!tolerancePct || tolerancePct <= 0) {
+                this.app.showError('Please select a valid tolerance percentage');
+                return;
+            }
             
             const processingOptions = {
                 tolerancePct,
@@ -760,7 +831,11 @@ export class EnhancedProcessing {
             // Show processing message
             this.app.showLoading('🔄 Processing your inventory with AI pricing... This may take several minutes for large files.');
             
-            const tolerancePct = parseInt(document.getElementById('priceTolerance')?.value || '50');
+            const tolerancePct = parseInt(document.getElementById('priceTolerance')?.value);
+            if (!tolerancePct || tolerancePct <= 0) {
+                this.app.showError('Please select a valid tolerance percentage');
+                return;
+            }
             
             const processingOptions = {
                 tolerancePct,
@@ -2626,7 +2701,11 @@ export class EnhancedProcessing {
             // Show processing message
             this.app.showLoading('🔄 Processing your inventory with AI pricing... This may take several minutes for large files.');
             
-            const tolerancePct = parseInt(document.getElementById('priceTolerance')?.value || '50');
+            const tolerancePct = parseInt(document.getElementById('priceTolerance')?.value);
+            if (!tolerancePct || tolerancePct <= 0) {
+                this.app.showError('Please select a valid tolerance percentage');
+                return;
+            }
             
             const processingOptions = {
                 tolerancePct,

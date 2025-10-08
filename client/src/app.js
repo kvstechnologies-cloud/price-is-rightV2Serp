@@ -802,7 +802,7 @@ class InsurancePricingApp {
                         
                         try {
                             response = await this.apiService.processCSV(file, {
-                                priceTolerance: 50 // Default tolerance
+                                priceTolerance: parseInt(document.getElementById('priceTolerance')?.value) || 10
                             });
                         } finally {
                             // Hide loading indicator (this will show disabled robot icon briefly)
@@ -826,7 +826,7 @@ class InsurancePricingApp {
                     response = await this.apiService.processItem({
                         description: description,
                         costToReplace: costToReplace,
-                        priceTolerance: 50 // Default tolerance
+                        priceTolerance: parseInt(document.getElementById('priceTolerance')?.value) || 10
                     });
                     console.log('🔍 Frontend Debug: API response received:', response);
                 } finally {

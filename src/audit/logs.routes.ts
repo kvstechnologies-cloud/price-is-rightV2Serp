@@ -93,7 +93,7 @@ router.get('/jobs', requireAuditEnabled, requireAuth, async (req: Request, res: 
 
     // Get counts for each job
     const jobSummaries: JobSummary[] = await Promise.all(
-      data.map(async (job) => {
+      data.map(async (job: any) => {
         const itemCounts = await db.select({
           total: count(),
           completed: count(sql`CASE WHEN ${jobItems.status} = 'DONE' THEN 1 END`),
@@ -303,7 +303,7 @@ router.get('/items/:itemId', requireAuditEnabled, requireAuth, async (req: Reque
         errorMessage: item.errorMessage,
         createdAt: item.createdAt,
       },
-      searchEvents: events.map(event => ({
+      searchEvents: events.map((event: any) => ({
         ...event,
         results: event.resultsJson ? JSON.parse(event.resultsJson) : [],
       })),
@@ -361,7 +361,7 @@ router.get('/summary', requireAuditEnabled, requireAuth, async (req: Request, re
     let totalJobs = 0;
     let successJobs = 0;
 
-    jobStats.forEach(stat => {
+    jobStats.forEach((stat: any) => {
       const type = stat.jobType;
       const status = stat.status;
       const count = stat.count;
@@ -405,7 +405,7 @@ router.get('/summary', requireAuditEnabled, requireAuth, async (req: Request, re
     .orderBy(desc(count()))
     .limit(10);
 
-    const topDomains = domainStats.map(stat => ({
+    const topDomains = domainStats.map((stat: any) => ({
       domain: stat.domain!,
       count: stat.count,
     }));

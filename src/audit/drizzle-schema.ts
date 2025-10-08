@@ -1,4 +1,4 @@
-import { mysqlTable, varchar, text, timestamp, int, bigint, mysqlEnum, datetime, tinyint, index, primaryKey, sql } from 'drizzle-orm/mysql-core';
+import { mysqlTable, varchar, text, timestamp, int, bigint, mysqlEnum, datetime, tinyint, index, primaryKey } from 'drizzle-orm/mysql-core';
 
 // Users table
 export const users = mysqlTable('users', {
@@ -63,7 +63,7 @@ export const searchEvents = mysqlTable('search_events', {
   jobItemId: varchar('job_item_id', { length: 36 }).notNull(),
   engine: mysqlEnum('engine', ['serpapi', 'cse', 'scraper']).notNull(),
   queryText: text('query_text'),
-  startedAt: datetime('started_at').default(sql`CURRENT_TIMESTAMP`),
+  startedAt: datetime('started_at').default(new Date()),
   completedAt: datetime('completed_at'),
   success: tinyint('success').notNull().default(0),
   errorMessage: text('error_message'),
@@ -86,7 +86,7 @@ export const finalChoices = mysqlTable('final_choices', {
   validatedPriceCents: int('validated_price_cents'),
   validationMethod: varchar('validation_method', { length: 64 }),
   isTrustedDomain: tinyint('is_trusted_domain').default(0),
-  decidedAt: datetime('decided_at').default(sql`CURRENT_TIMESTAMP`),
+  decidedAt: datetime('decided_at').default(new Date()),
   reason: text('reason'),
 });
 

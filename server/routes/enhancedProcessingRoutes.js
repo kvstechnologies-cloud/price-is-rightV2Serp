@@ -9,6 +9,7 @@ const ExcelJS = require('exceljs');
 const axios = require('axios');
 const gpt5Config = require('../config/gpt5Config');
 const { isTrustedSite } = require('../config/trustedSites');
+const PriceRangeCalculator = require('../utils/priceRangeCalculator');
 
 // Audit system (non-blocking)
 let Audit;
@@ -994,9 +995,32 @@ async function getDepreciationPercentage(category) {
 }
 
 // NEW: Enhanced Pricing with AI Description Enhancement
-async function processItemPricingWithAI(validatedRow, tolerancePct = 50) {
-  // FORCE: Always use the passed tolerance, never default to 10
-  tolerancePct = tolerancePct || 50;
+async function processItemPricingWithAI(validatedRow, tolerancePct) {
+  // Use only the provided tolerance - no defaults
+  if (!tolerancePct || tolerancePct <= 0) {
+    throw new Error('Tolerance percentage is required and must be greater than 0');
+  }
+
+  // Calculate price range based on tolerance
+  const { purchasePrice } = validatedRow;
+  console.log(`🔍 DEBUG: Price range calculation inputs - purchasePrice: ${purchasePrice} (type: ${typeof purchasePrice}), tolerancePct: ${tolerancePct} (type: ${typeof tolerancePct})`);
+  console.log(`🔍 DEBUG: validatedRow keys:`, Object.keys(validatedRow));
+  console.log(`🔍 DEBUG: validatedRow values:`, Object.values(validatedRow));
+  
+  if (!purchasePrice || purchasePrice <= 0) {
+    console.log(`❌ ERROR: Invalid purchasePrice: ${purchasePrice} - will estimate with OpenAI`);
+    // Don't throw error here - let the OpenAI estimation handle it
+    // The price range calculation will be done after estimation
+  } else {
+    const priceRange = PriceRangeCalculator.calculateRange(purchasePrice, tolerancePct);
+    console.log(`🎯 PRICE RANGE CALCULATION:`, {
+      basePrice: purchasePrice,
+      tolerance: tolerancePct,
+      range: priceRange.formattedRange,
+      minPrice: priceRange.minPrice,
+      maxPrice: priceRange.maxPrice
+    });
+  }
   const startTime = Date.now();
   const performanceSteps = {};
   // Ensure these are available in all code paths (including catch)
@@ -1101,9 +1125,8 @@ async function processItemPricingWithAI(validatedRow, tolerancePct = 50) {
       console.log(`⚠️ Bulk product "${description}" detected - trying tolerance-band search first`);
       // Try tolerance-band search for bulk items before falling back to estimation
       try {
-        const tol = Math.max(0, Number(tolerancePct) || 0) / 100;
-        const minAllowed = purchasePrice * (1 - tol);
-        const maxAllowed = purchasePrice * (1 + tol);
+        const minAllowed = priceRange.minPrice;
+        const maxAllowed = priceRange.maxPrice;
         console.log(`🎯 Bulk tolerance search for "${description}" band ${minAllowed}-${maxAllowed} (tol ${tolerancePct}%)`);
         
         // Enrich bulk queries with concrete synonyms
@@ -1181,7 +1204,7 @@ async function processItemPricingWithAI(validatedRow, tolerancePct = 50) {
         
         // Try direct product search with trusted retailers
                   try {
-                    const directSearchResult = await insuranceItemPricer.findBestPriceWithProductAPI(description, purchasePrice);
+                    const directSearchResult = await insuranceItemPricer.findBestPriceWithProductAPI(description, purchasePrice, tolerancePct);
                     if (directSearchResult && directSearchResult.url && !directSearchResult.url.includes('google.com/search')) {
                       console.log(`✅ FOUND DIRECT PRODUCT: ${directSearchResult.url} for "${description}"`);
                       
@@ -1261,7 +1284,7 @@ async function processItemPricingWithAI(validatedRow, tolerancePct = 50) {
         console.log(`🎯 ATTEMPTING DIRECT PRODUCT SEARCH (Fallback) for problematic item: "${description}"`);
         
         try {
-          const directSearchResult = await insuranceItemPricer.findBestPriceWithProductAPI(description, purchasePrice);
+          const directSearchResult = await insuranceItemPricer.findBestPriceWithProductAPI(description, purchasePrice, tolerancePct);
           if (directSearchResult && directSearchResult.url && !directSearchResult.url.includes('google.com/search')) {
             console.log(`✅ FOUND DIRECT PRODUCT (Fallback): ${directSearchResult.url} for "${description}"`);
             return {
@@ -1369,7 +1392,7 @@ async function processItemPricingWithAI(validatedRow, tolerancePct = 50) {
         console.log(`🎯 ATTEMPTING DIRECT PRODUCT SEARCH (Bulk Fallback) for problematic item: "${description}"`);
         
                   try {
-                    const directSearchResult = await insuranceItemPricer.findBestPriceWithProductAPI(description, purchasePrice);
+                    const directSearchResult = await insuranceItemPricer.findBestPriceWithProductAPI(description, purchasePrice, tolerancePct);
                     if (directSearchResult && directSearchResult.url && !directSearchResult.url.includes('google.com/search')) {
                       console.log(`✅ FOUND DIRECT PRODUCT (Bulk Fallback): ${directSearchResult.url} for "${description}"`);
                       
@@ -1436,7 +1459,7 @@ async function processItemPricingWithAI(validatedRow, tolerancePct = 50) {
         console.log(`🎯 ATTEMPTING DIRECT PRODUCT SEARCH (Bulk Fallback) for problematic item: "${description}"`);
         
         try {
-          const directSearchResult = await insuranceItemPricer.findBestPriceWithProductAPI(description, purchasePrice);
+          const directSearchResult = await insuranceItemPricer.findBestPriceWithProductAPI(description, purchasePrice, tolerancePct);
           console.log(`🔍 BULK FALLBACK DEBUG: Search result for "${description}":`, directSearchResult);
           
           if (directSearchResult && directSearchResult.url && !directSearchResult.url.includes('google.com/search')) {
@@ -1499,9 +1522,8 @@ async function processItemPricingWithAI(validatedRow, tolerancePct = 50) {
     // NEW: Generic product → try tolerance-band search first to return Found
     if (isGeneric) {
       try {
-        const tol = Math.max(0, Number(tolerancePct) || 0) / 100;
-        const minAllowed = purchasePrice * (1 - tol);
-        const maxAllowed = purchasePrice * (1 + tol);
+        const minAllowed = priceRange.minPrice;
+        const maxAllowed = priceRange.maxPrice;
         console.log(`🎯 Generic tolerance search for "${description}" band ${minAllowed}-${maxAllowed} (tol ${tolerancePct}%)`);
         // Enrich generic queries with concrete synonyms to improve exact matches
         const lower = (enhancedDescription || description || '').toLowerCase();
@@ -1576,7 +1598,7 @@ async function processItemPricingWithAI(validatedRow, tolerancePct = 50) {
         
         // Try direct product search with trusted retailers
                   try {
-                    const directSearchResult = await insuranceItemPricer.findBestPriceWithProductAPI(description, purchasePrice);
+                    const directSearchResult = await insuranceItemPricer.findBestPriceWithProductAPI(description, purchasePrice, tolerancePct);
                     if (directSearchResult && directSearchResult.url && !directSearchResult.url.includes('google.com/search')) {
                       console.log(`✅ FOUND DIRECT PRODUCT (Generic Fallback): ${directSearchResult.url} for "${description}"`);
                       
@@ -1630,8 +1652,8 @@ async function processItemPricingWithAI(validatedRow, tolerancePct = 50) {
     // STEP 2: ALWAYS try SerpAPI first to find lowest price from trusted retailers
     if (insuranceItemPricer) {
       // NEW: Use ChatGPT-suggested Product API approach
-      // FIXED: Pass original purchasePrice as maxPrice, let the method handle the 50% tolerance internally
-      const result = await insuranceItemPricer.findBestPriceWithProductAPI(enhancedDescription, purchasePrice);
+      // FIXED: Pass original purchasePrice as maxPrice, let the method handle the user-selected tolerance internally
+      const result = await insuranceItemPricer.findBestPriceWithProductAPI(enhancedDescription, purchasePrice, tolerancePct);
       
       // CRITICAL DEBUG: Log what Product API returned
       console.log(`🔍 PRODUCT API RESULT DEBUG for "${enhancedDescription}":`);
@@ -1648,7 +1670,7 @@ async function processItemPricingWithAI(validatedRow, tolerancePct = 50) {
       if (!result) {
         console.log(`🚨 CRITICAL: Product API returned null - this means NO PRODUCTS were found!`);
         console.log(`🚨 This could indicate: 1) SerpAPI not working, 2) Search too specific, 3) Price range too restrictive`);
-        console.log(`🚨 Query used: "${enhancedDescription}", Target price: $${purchasePrice}, 50% tolerance range: $${purchasePrice * 0.5} - $${purchasePrice * 1.5}`);
+        console.log(`🚨 Query used: "${enhancedDescription}", Target price: $${purchasePrice}, tolerance range will be calculated based on user selection`);
         
         // FORCE DIRECT URLs for problematic items when Product API fails
         const lowerDescription = enhancedDescription.toLowerCase();
@@ -1669,7 +1691,7 @@ async function processItemPricingWithAI(validatedRow, tolerancePct = 50) {
           
           // Try direct product search with trusted retailers
           try {
-            const directSearchResult = await insuranceItemPricer.findBestPriceWithProductAPI(enhancedDescription, purchasePrice);
+            const directSearchResult = await insuranceItemPricer.findBestPriceWithProductAPI(enhancedDescription, purchasePrice, tolerancePct);
             if (directSearchResult && directSearchResult.url && !directSearchResult.url.includes('google.com/search')) {
               console.log(`✅ FOUND DIRECT PRODUCT (Product API Failed): ${directSearchResult.url} for "${enhancedDescription}"`);
               return {
@@ -2364,10 +2386,8 @@ const CANONICAL_FIELDS = {
   QTY: 'QTY',
   DESCRIPTION: 'Description',
   BRAND: 'Brand',
-  MODEL: 'Model#',
   AGE: 'Age (Years)',
   CONDITION: 'Condition',
-  ORIGINAL_SOURCE: 'Original Source',
   PURCHASE_PRICE: 'Purchase Price',
   TOTAL_PURCHASE_PRICE: 'Total Purchase Price'
 };
@@ -2411,24 +2431,39 @@ function mapFields(headers) {
   headers.forEach(header => {
     const normalizedHeader = header.trim().toLowerCase();
     
-    // PRIORITY 1: Cost to Replace Pre-Tax (each) - ALWAYS map this first for Purchase Price
-    if (normalizedHeader.includes('cost') && normalizedHeader.includes('replace')) {
+    // PRIORITY 1: Exact match for "Purchase Price" - most common format
+    if (normalizedHeader === 'purchase price') {
       mapping[CANONICAL_FIELDS.PURCHASE_PRICE] = header;
-      console.log(`🎯 PRIORITY MAPPED: "${header}" → Purchase Price (Cost to Replace)`);
+      console.log(`🎯 EXACT MATCH: "${header}" → Purchase Price`);
+    }
+    
+    // PRIORITY 2: Cost to Replace Pre-Tax (each) - insurance format
+    if (!mapping[CANONICAL_FIELDS.PURCHASE_PRICE] && 
+        normalizedHeader.includes('cost') && normalizedHeader.includes('replace')) {
+      mapping[CANONICAL_FIELDS.PURCHASE_PRICE] = header;
+      console.log(`🎯 MAPPED: "${header}" → Purchase Price (Cost to Replace)`);
+    }
+    
+    // PRIORITY 3: Purchase Price Each - alternative format
+    if (!mapping[CANONICAL_FIELDS.PURCHASE_PRICE] && 
+        normalizedHeader.includes('purchase') && normalizedHeader.includes('price')) {
+      mapping[CANONICAL_FIELDS.PURCHASE_PRICE] = header;
+      console.log(`🎯 MAPPED: "${header}" → Purchase Price (Purchase Price Each)`);
     }
     
     // DEBUG: Log all headers to see what we're working with
     console.log(`🔍 Header: "${header}" → Normalized: "${normalizedHeader}"`);
     
-    // PRIORITY 2: Description - Handle both "Description" and "Item Description"
-    if (normalizedHeader === 'description' || normalizedHeader === 'desc') {
+    // PRIORITY 2: Description - Exact match first
+    if (normalizedHeader === 'description') {
       mapping[CANONICAL_FIELDS.DESCRIPTION] = header;
-      console.log(`🎯 PRIORITY MAPPED: "${header}" → Description`);
+      console.log(`🎯 EXACT MATCH: "${header}" → Description`);
     }
-    // CRITICAL FIX: Map "Item Description" to the canonical Description field
-    if (normalizedHeader.includes('item') && normalizedHeader.includes('description')) {
+    // Alternative: Item Description
+    if (!mapping[CANONICAL_FIELDS.DESCRIPTION] && 
+        normalizedHeader.includes('item') && normalizedHeader.includes('description')) {
       mapping[CANONICAL_FIELDS.DESCRIPTION] = header;
-      console.log(`🎯 PRIORITY MAPPED: "${header}" → Description (Item Description)`);
+      console.log(`🎯 MAPPED: "${header}" → Description (Item Description)`);
     }
     
     // Other fields
@@ -2447,36 +2482,42 @@ function mapFields(headers) {
       console.log(`🎯 MAPPED: "${header}" → Purchase Price (Purchase Price Each)`);
     }
     
-    if (normalizedHeader.includes('quantity') || normalizedHeader.includes('qty') || normalizedHeader.includes('lost')) {
+    // Quantity - exact match for "QTY" first
+    if (normalizedHeader === 'qty') {
       mapping[CANONICAL_FIELDS.QTY] = header;
+      console.log(`🎯 EXACT MATCH: "${header}" → QTY`);
+    }
+    // Alternative quantity fields
+    if (!mapping[CANONICAL_FIELDS.QTY] && 
+        (normalizedHeader.includes('quantity') || normalizedHeader.includes('lost'))) {
+      mapping[CANONICAL_FIELDS.QTY] = header;
+      console.log(`🎯 MAPPED: "${header}" → QTY`);
     }
     if (normalizedHeader.includes('room')) {
       mapping[CANONICAL_FIELDS.ROOM] = header;
     }
-    if (normalizedHeader.includes('model')) {
-      mapping[CANONICAL_FIELDS.MODEL] = header;
-    }
+    // Model field removed as requested
     if (normalizedHeader.includes('age')) {
       mapping[CANONICAL_FIELDS.AGE] = header;
     }
     if (normalizedHeader.includes('condition')) {
       mapping[CANONICAL_FIELDS.CONDITION] = header;
     }
-    if (normalizedHeader.includes('vendor') || normalizedHeader.includes('source')) {
-      mapping[CANONICAL_FIELDS.ORIGINAL_SOURCE] = header;
-    }
+    // Original Source field removed as requested
     if (normalizedHeader.includes('total') && normalizedHeader.includes('cost')) {
       mapping[CANONICAL_FIELDS.TOTAL_PURCHASE_PRICE] = header;
     }
   });
   
+  // No fallback - require exact field mapping
+  
   console.log('📋 Final field mapping:', mapping);
   console.log('🎯 CANONICAL_FIELDS.PURCHASE_PRICE:', CANONICAL_FIELDS.PURCHASE_PRICE);
   console.log('🎯 Mapped purchase price field:', mapping[CANONICAL_FIELDS.PURCHASE_PRICE]);
   
-  // Check for missing required fields
+  // Check for missing required fields - only core fields that are always present
   const missingFields = [];
-  const requiredFields = [CANONICAL_FIELDS.QTY, CANONICAL_FIELDS.DESCRIPTION, CANONICAL_FIELDS.PURCHASE_PRICE];
+  const requiredFields = [CANONICAL_FIELDS.DESCRIPTION, CANONICAL_FIELDS.PURCHASE_PRICE];
   
   for (const field of requiredFields) {
     if (!mapping[field]) {
@@ -2500,7 +2541,8 @@ function validateRow(row, fieldMapping) {
     // Handle special cases
     switch (canonicalField) {
       case CANONICAL_FIELDS.QTY:
-        // Use the same robust parsing as shouldSkipRow
+        // Use the same robust parsing as shouldSkipRow, default to 1 if missing
+        console.log(`🔍 Parsing QTY: "${value}" (type: ${typeof value})`);
         if (value && value.toString().trim() !== '') {
           const cleanQty = value.toString()
             .replace(/[^\d.-]/g, '') // Keep only digits, dots, and minus signs
@@ -2508,11 +2550,14 @@ function validateRow(row, fieldMapping) {
           
           if (cleanQty && cleanQty !== '') {
             value = parseInt(cleanQty) || 1;
+            console.log(`✅ Parsed QTY: ${value}`);
           } else {
             value = 1;
+            console.log(`⚠️ Invalid QTY, using default: 1`);
           }
         } else {
           value = 1;
+          console.log(`⚠️ Missing QTY, using default: 1`);
         }
         
         if (value <= 0) value = 1;
@@ -2520,14 +2565,17 @@ function validateRow(row, fieldMapping) {
         
       case CANONICAL_FIELDS.PURCHASE_PRICE:
         // Use the same robust parsing as shouldSkipRow
+        console.log(`🔍 Parsing purchase price: "${value}" (type: ${typeof value})`);
         if (value && value.toString().trim() !== '') {
           const cleanPrice = value.toString()
             .replace(/[$,]/g, '')  // Remove $ and commas
             .replace(/[^\d.-]/g, '') // Keep only digits, dots, and minus signs
             .trim();
           
+          console.log(`🔍 Cleaned price: "${cleanPrice}"`);
           if (cleanPrice && cleanPrice !== '') {
             value = parseFloat(cleanPrice) || 0;
+            console.log(`✅ Parsed purchase price: ${value}`);
           } else {
             value = 0;
           }
@@ -2719,7 +2767,32 @@ Return ONLY the JSON object, no other text.`;
 }
 
 // Enhanced pricing logic with tolerance and status tracking
-async function processItemPricing(item, tolerancePct = 50) {
+async function processItemPricing(item, tolerancePct) {
+  // Use only the provided tolerance - no defaults
+  if (!tolerancePct || tolerancePct <= 0) {
+    throw new Error('Tolerance percentage is required and must be greater than 0');
+  }
+
+  // Calculate price range based on tolerance
+  const itemPurchasePrice = item[CANONICAL_FIELDS.PURCHASE_PRICE];
+  console.log(`🔍 DEBUG: Price range calculation inputs - purchasePrice: ${itemPurchasePrice} (type: ${typeof itemPurchasePrice}), tolerancePct: ${tolerancePct} (type: ${typeof tolerancePct})`);
+  console.log(`🔍 DEBUG: item keys:`, Object.keys(item));
+  console.log(`🔍 DEBUG: item values:`, Object.values(item));
+  
+  if (!itemPurchasePrice || itemPurchasePrice <= 0) {
+    console.log(`❌ ERROR: Invalid purchasePrice: ${itemPurchasePrice} - will estimate with OpenAI`);
+    // Don't throw error here - let the OpenAI estimation handle it
+    // The price range calculation will be done after estimation
+  } else {
+    const priceRange = PriceRangeCalculator.calculateRange(itemPurchasePrice, tolerancePct);
+    console.log(`🎯 PRICE RANGE CALCULATION:`, {
+      basePrice: itemPurchasePrice,
+      tolerance: tolerancePct,
+      range: priceRange.formattedRange,
+      minPrice: priceRange.minPrice,
+      maxPrice: priceRange.maxPrice
+    });
+  }
   const startTime = Date.now();
   const timings = {
     start: startTime,
@@ -2756,10 +2829,9 @@ async function processItemPricing(item, tolerancePct = 50) {
       timings.steps.pricerDuration = pricerTime;
       console.log(`⏱️ InsuranceItemPricer took: ${pricerTime}ms`);
 
-      // Compute tolerance band
-      const tol = Math.max(0, Number(tolerancePct) || 0) / 100;
-      const minAllowed = purchasePrice * (1 - tol);
-      const maxAllowed = purchasePrice * (1 + tol);
+      // Use calculated price range
+      const minAllowed = priceRange.minPrice;
+      const maxAllowed = priceRange.maxPrice;
 
       // Transform result to match our expected format, respecting tolerance band
       // PERFORMANCE FIX: Reduce logging
@@ -3027,9 +3099,8 @@ async function processItemPricing(item, tolerancePct = 50) {
           ];
           const descLower = (description || '').toLowerCase().trim();
           const isGeneric = genericTerms.includes(descLower);
-          const tol = Math.max(0, Number(tolerancePct) || 0) / 100;
-          const minAllowed = purchasePrice * (1 - tol);
-          const maxAllowed = purchasePrice * (1 + tol);
+          const minAllowed = priceRange.minPrice;
+          const maxAllowed = priceRange.maxPrice;
 
           if (isGeneric && purchasePrice > 0 && typeof insuranceItemPricer?.searchWithProductValidation === 'function') {
             console.log(`🎯 Generic fallback engaged for "${description}" with band ${minAllowed}-${maxAllowed} (tol ${tolerancePct}%)`);
@@ -3718,7 +3789,13 @@ function findDataHeaderRow(jsonData) {
     try {
       const file = req.files?.file?.[0];
       const selectedSheet = req.body?.selectedSheet;
-      const tolerancePct = req.body?.tolerancePct || 50;
+      const tolerancePct = req.body?.tolerancePct;
+      if (!tolerancePct || tolerancePct <= 0) {
+        return res.status(400).json({ 
+          error: 'Tolerance percentage is required and must be greater than 0',
+          message: 'Please specify a valid tolerance percentage'
+        });
+      }
       const fieldMapping = req.body?.fieldMapping;
       
       if (!file) {
@@ -4678,9 +4755,10 @@ function findDataHeaderRow(jsonData) {
       try {
         if (insuranceItemPricer && typeof insuranceItemPricer.findBestPrice === 'function') {
           console.log('🧪 TEST DEBUG: Calling insuranceItemPricer.findBestPrice directly for comparison');
-          const pricerResult = await insuranceItemPricer.findBestPrice(description, purchasePrice || null, tolerancePct || 50);
+          const pricerResult = await insuranceItemPricer.findBestPrice(description, purchasePrice || null, tolerancePct);
           debug.pricerResult = pricerResult;
           console.log('🧪 TEST DEBUG: pricerResult:', pricerResult);
+          console.log(`🔍 DEBUG: Price validation for "${description}" - Status: ${pricerResult?.Status}, Price: $${pricerResult?.Price}, Target: $${purchasePrice}, Tolerance: ${tolerancePct}%`);
         } else {
           debug.pricerResult = null;
           debug.note = 'insuranceItemPricer not available or missing findBestPrice()';
@@ -4703,6 +4781,10 @@ function findDataHeaderRow(jsonData) {
 
 // NEW: Resilient SerpAPI Call with Retry Logic (Never Fails)
 async function resilientSerpAPICall(description, purchasePrice, tolerancePct, maxRetries = 3) {
+  // Use only the provided tolerance - no defaults
+  if (!tolerancePct || tolerancePct <= 0) {
+    throw new Error('Tolerance percentage is required and must be greater than 0');
+  }
   console.log(`🔍 resilientSerpAPICall called for "${description}"`);
   console.log(`🔍 Description type: ${typeof description}, length: ${description ? description.length : 'null'}`);
   console.log(`🔍 Description value: "${description}"`);

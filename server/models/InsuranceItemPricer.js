@@ -39,6 +39,9 @@ try {
 // ENHANCED: Direct URL Resolution for "Found" status
 const DirectUrlResolver = require('../utils/directUrlResolver');
 
+// ENHANCED: Product availability validation
+const ProductAvailabilityValidator = require('../utils/productAvailabilityValidator');
+
 const DEBUG_LOGGING = true;
 const axios = require('axios');
 const cheerio = require('cheerio');
@@ -135,6 +138,15 @@ class InsuranceItemPricer {
     } catch (error) {
       console.log('⚠️ DirectUrlResolver initialization failed, using fallback');
       this.directUrlResolver = null;
+    }
+    
+    // Initialize ProductAvailabilityValidator for availability checking
+    try {
+      this.availabilityValidator = new ProductAvailabilityValidator();
+      console.log('✅ ProductAvailabilityValidator initialized');
+    } catch (error) {
+      console.log('⚠️ ProductAvailabilityValidator initialization failed, using fallback');
+      this.availabilityValidator = null;
     }
     
     this.serpApiKey = process.env.SERPAPI_KEY;
@@ -945,7 +957,25 @@ class InsuranceItemPricer {
   }
 
   // MAIN METHOD: Enhanced with accurate product matching and FIXED URL handling
-  async findBestPrice(query, targetPrice = null, tolerance = 50) {
+  async findBestPrice(query, targetPrice = null, tolerance) {
+    // Use only the provided tolerance - no defaults
+    if (!tolerance || tolerance <= 0) {
+      throw new Error('Tolerance percentage is required and must be greater than 0');
+    }
+
+    // Calculate price range if target price is provided
+    let priceRange = null;
+    if (targetPrice && targetPrice > 0) {
+      const PriceRangeCalculator = require('../utils/priceRangeCalculator');
+      priceRange = PriceRangeCalculator.calculateRange(targetPrice, tolerance);
+      console.log(`🎯 PRICE RANGE CALCULATION:`, {
+        basePrice: targetPrice,
+        tolerance: tolerance,
+        range: priceRange.formattedRange,
+        minPrice: priceRange.minPrice,
+        maxPrice: priceRange.maxPrice
+      });
+    }
     console.log('🎯 ENHANCED PRICING: Starting search for:', query);
     console.log(`🔑 SerpAPI Key Available: ${!!this.serpApiKey} (${this.serpApiKey ? 'ENABLED' : 'DISABLED'})`);
     
@@ -969,11 +999,26 @@ class InsuranceItemPricer {
         if (this.directUrlCache.has(cacheKey)) {
           const cached = this.directUrlCache.get(cacheKey);
           if (cached && cached.found && this.isDirectRetailerProductUrl(cached.url)) {
-            this.requestStats.cached += 1;
-            console.log(`⚡ MEMORY CACHE HIT for "${cacheKey}" → ${cached.source}`);
-            this.researchTracker.updateSearchResults(attemptId, cached);
-            this.researchTracker.completeResearchAttempt(attemptId, cached, Date.now());
-            return cached;
+            // STRICT: Validate cached result against tolerance range
+            if (targetPrice && priceRange && cached.Price) {
+              const isWithinRange = cached.Price >= priceRange.minPrice && cached.Price <= priceRange.maxPrice;
+              if (!isWithinRange) {
+                console.log(`❌ CACHE REJECTION: Cached price $${cached.Price} is outside tolerance range $${priceRange.minPrice} - $${priceRange.maxPrice}`);
+                // Don't return cached result, continue with fresh search
+              } else {
+                this.requestStats.cached += 1;
+                console.log(`⚡ MEMORY CACHE HIT for "${cacheKey}" → ${cached.source} (within tolerance)`);
+                this.researchTracker.updateSearchResults(attemptId, cached);
+                this.researchTracker.completeResearchAttempt(attemptId, cached, Date.now());
+                return cached;
+              }
+            } else {
+              this.requestStats.cached += 1;
+              console.log(`⚡ MEMORY CACHE HIT for "${cacheKey}" → ${cached.source}`);
+              this.researchTracker.updateSearchResults(attemptId, cached);
+              this.researchTracker.completeResearchAttempt(attemptId, cached, Date.now());
+              return cached;
+            }
           }
         }
         
@@ -986,15 +1031,34 @@ class InsuranceItemPricer {
             if (cachedData) {
               const cached = JSON.parse(cachedData);
               if (cached && cached.found && this.isDirectRetailerProductUrl(cached.url)) {
-                this.requestStats.cached += 1;
-                console.log(`⚡ REDIS CACHE HIT for "${cacheKey}" → ${cached.source}`);
-                
-                // Write to memory cache for faster future access
-                this.directUrlCache.set(cacheKey, cached);
-                
-                this.researchTracker.updateSearchResults(attemptId, cached);
-                this.researchTracker.completeResearchAttempt(attemptId, cached, Date.now());
-                return cached;
+                // STRICT: Validate Redis cached result against tolerance range
+                if (targetPrice && priceRange && cached.Price) {
+                  const isWithinRange = cached.Price >= priceRange.minPrice && cached.Price <= priceRange.maxPrice;
+                  if (!isWithinRange) {
+                    console.log(`❌ REDIS CACHE REJECTION: Cached price $${cached.Price} is outside tolerance range $${priceRange.minPrice} - $${priceRange.maxPrice}`);
+                    // Don't return cached result, continue with fresh search
+                  } else {
+                    this.requestStats.cached += 1;
+                    console.log(`⚡ REDIS CACHE HIT for "${cacheKey}" → ${cached.source} (within tolerance)`);
+                    
+                    // Write to memory cache for faster future access
+                    this.directUrlCache.set(cacheKey, cached);
+                    
+                    this.researchTracker.updateSearchResults(attemptId, cached);
+                    this.researchTracker.completeResearchAttempt(attemptId, cached, Date.now());
+                    return cached;
+                  }
+                } else {
+                  this.requestStats.cached += 1;
+                  console.log(`⚡ REDIS CACHE HIT for "${cacheKey}" → ${cached.source}`);
+                  
+                  // Write to memory cache for faster future access
+                  this.directUrlCache.set(cacheKey, cached);
+                  
+                  this.researchTracker.updateSearchResults(attemptId, cached);
+                  this.researchTracker.completeResearchAttempt(attemptId, cached, Date.now());
+                  return cached;
+                }
               }
             }
           } catch (redisError) {
@@ -1188,8 +1252,13 @@ class InsuranceItemPricer {
    * 2. Use Google Product API to get all sellers for each product
    * 3. Pick lowest price from trusted retailers
    */
-  async findBestPriceWithProductAPI(query, maxPrice = null) {
+  async findBestPriceWithProductAPI(query, maxPrice = null, tolerance = null) {
     try {
+      // STRICT: Validate tolerance parameter
+      if (tolerance && tolerance > 0) {
+        console.log(`🔍 STRICT VALIDATION: findBestPriceWithProductAPI called with tolerance ${tolerance}%`);
+      }
+      
       // IMPROVED: Normalize search query to fix duplicate words
       let normalizedQuery = query;
       
@@ -1322,20 +1391,22 @@ class InsuranceItemPricer {
       
       console.log(`✅ Found ${allSellers.length} total sellers across all products`);
       
-      // Step 3: Filter by trusted retailers and 50% tolerance price range
+      // Step 3: Filter by trusted retailers and tolerance price range
+      console.log(`🔍 DEBUG: About to filter sellers. tolerance=${tolerance}, maxPrice=${maxPrice}`);
       const trustedSellers = allSellers.filter(seller => {
         // Allow-by-default: accept all unless explicitly untrusted
         const sourceLower = seller.name.toLowerCase(); // Use 'name' instead of 'source'
         const isTrusted = !UNTRUSTED_DOMAINS.some(domain => sourceLower.includes(domain));
         
-        // Apply 50% tolerance price filter if maxPrice is specified
+        // Apply tolerance price filter if maxPrice is specified
         const price = parseFloat(seller.base_price?.replace(/[$,]/g, '') || '0') || 0; // Use 'base_price' instead of 'extracted_price'
         let withinPriceRange = true;
         
-        if (maxPrice) {
-          // Calculate 50% tolerance range: 50% below to 50% above the purchase price
-          const minPrice = maxPrice * 0.5; // 50% below
-          const maxTolerancePrice = maxPrice * 1.5; // 50% above
+        if (maxPrice && tolerance && tolerance > 0) {
+          // Calculate tolerance range based on user-selected tolerance
+          const toleranceFraction = tolerance / 100;
+          const minPrice = maxPrice * (1 - toleranceFraction);
+          const maxTolerancePrice = maxPrice * (1 + toleranceFraction);
           withinPriceRange = price >= minPrice && price <= maxTolerancePrice;
           
           console.log(`🔍 Price filter: $${price} (min: $${minPrice}, max: $${maxTolerancePrice}, within range: ${withinPriceRange})`);
@@ -1345,7 +1416,7 @@ class InsuranceItemPricer {
       });
       
       if (trustedSellers.length === 0) {
-        console.log(`❌ No trusted sellers found within 50% tolerance price range`);
+        console.log(`❌ No trusted sellers found within user-selected tolerance price range`);
         return null;
       }
       
@@ -1370,6 +1441,30 @@ class InsuranceItemPricer {
       const directLink = this.extractDirectLink(bestSeller.direct_link, bestSeller.name); // Use 'direct_link' and 'name'
       
       console.log(`✅ BEST SELLER: ${bestSeller.name} - $${price} - ${directLink}`);
+      
+      // STRICT VALIDATION: Check if price is within tolerance range
+      if (tolerance && tolerance > 0 && maxPrice && maxPrice > 0) {
+        const priceRange = {
+          minPrice: maxPrice * (1 - tolerance / 100),
+          maxPrice: maxPrice * (1 + tolerance / 100)
+        };
+        
+        console.log(`🔍 STRICT VALIDATION: Price $${price} vs Range $${priceRange.minPrice} - $${priceRange.maxPrice}`);
+        
+        if (price < priceRange.minPrice || price > priceRange.maxPrice) {
+          console.log(`❌ STRICT REJECTION: Price $${price} is outside tolerance range $${priceRange.minPrice} - $${priceRange.maxPrice}`);
+          return {
+            price: price,
+            source: bestSeller.name,
+            url: directLink,
+            status: 'Rejected',
+            matchQuality: 'Outside Tolerance',
+            rejectionReason: `Price $${price} outside ${tolerance}% tolerance range`
+          };
+        }
+        
+        console.log(`✅ STRICT APPROVAL: Price $${price} is within tolerance range`);
+      }
       
       // NO HARDCODED URLs - rely on dynamic search and DirectUrlResolver
       let finalUrl = directLink;
@@ -2193,22 +2288,11 @@ class InsuranceItemPricer {
       queryTerms.searchTerms = words;
       
       // Apply strict product validation
-      const validatedResult = await this.findBestValidatedMatch(results, queryTerms, minPriceParam, maxPriceParam, targetPrice, tolerance);
+      const validatedResult = await this.findBestValidatedMatch(results, queryTerms, minPriceParam, maxPriceParam, targetPrice, tolerance, priceRange);
       
-      // If strict validation fails, try a more permissive approach for general products
-      if (validatedResult.Status === 'estimated' && validatedResult.Price === null) {
-        if (this.debugMode) {
-          console.log(`🔍 Strict validation failed, trying permissive validation...`);
-        }
-        
-        // Use a more permissive validation approach
-        const permissiveResult = await this.findBestValidatedMatchPermissive(results, queryTerms, minPriceParam, maxPriceParam, targetPrice, tolerance);
-        if (permissiveResult && permissiveResult.Price !== null) {
-          if (this.debugMode) {
-            console.log(`✅ Permissive validation succeeded: ${permissiveResult.Title} at $${permissiveResult.Price}`);
-          }
-          return permissiveResult;
-        }
+      // STRICT: No permissive fallback - only use strict validation results
+      if (this.debugMode) {
+        console.log(`🔍 STRICT VALIDATION RESULT: ${validatedResult.Status} - ${validatedResult.Notes || 'No additional notes'}`);
       }
       
       return validatedResult;
@@ -2563,8 +2647,88 @@ class InsuranceItemPricer {
     return null;
   }
 
+  // Google Fallback Method - Search with broader criteria when strict validation fails
+  async performGoogleFallback(query, targetPrice, tolerance) {
+    console.log(`🔄 GOOGLE FALLBACK: Searching for "${query}" with broader criteria`);
+    
+    try {
+      // Use a broader price range for Google fallback (use 2x the user tolerance for broader search)
+      const fallbackTolerance = Math.min(tolerance * 2, 100); // Broader but still reasonable
+      const fallbackRange = {
+        minPrice: Math.max(0, targetPrice * (1 - fallbackTolerance / 100)),
+        maxPrice: targetPrice * (1 + fallbackTolerance / 100)
+      };
+      
+      console.log(`🔍 GOOGLE FALLBACK RANGE: $${fallbackRange.minPrice} - $${fallbackRange.maxPrice} (${fallbackTolerance}% tolerance)`);
+      
+      // Perform a broader search using SerpAPI
+      const fallbackResults = await this.performValidatedSearch(query, 5000, fallbackRange.minPrice, fallbackRange.maxPrice);
+      
+      if (!fallbackResults || fallbackResults.length === 0) {
+        console.log(`❌ GOOGLE FALLBACK: No results found even with broader search`);
+        return null;
+      }
+      
+      // Find the best match from Google results
+      let bestMatch = null;
+      let bestPrice = Infinity;
+      
+      for (const result of fallbackResults) {
+        const price = parseFloat(result.extracted_price || result.price || 0);
+        if (price > 0 && price < bestPrice) {
+          bestMatch = result;
+          bestPrice = price;
+        }
+      }
+      
+      if (!bestMatch) {
+        console.log(`❌ GOOGLE FALLBACK: No valid prices found in results`);
+        return null;
+      }
+      
+      // Create Google Shopping URL
+      const googleUrl = `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(query)}`;
+      
+      console.log(`✅ GOOGLE FALLBACK SUCCESS: Found $${bestPrice} from ${bestMatch.source}`);
+      
+      return {
+        Price: bestPrice,
+        Currency: "USD",
+        Source: bestMatch.source || 'Google Shopping',
+        URL: googleUrl,
+        Status: 'Found (Google Fallback)',
+        Pricer: "Google-Fallback",
+        Title: bestMatch.title || query,
+        Brand: "Unknown",
+        Model: "Unknown",
+        Confidence: 0.6, // Lower confidence since it's a fallback
+        Notes: `FOUND via Google fallback: $${bestPrice} (outside strict tolerance but within broader search)`,
+        MatchedAttributes: {
+          Brand: "unknown",
+          Model: "unknown",
+          UPC_EAN: "unknown",
+          Size_Pack: "unknown",
+          Color: "unknown",
+          Material: "unknown"
+        },
+        ValidationStatus: 'GOOGLE_FALLBACK_APPROVED',
+        PriceRange: `${fallbackRange.minPrice} - ${fallbackRange.maxPrice}`,
+        Trace: {
+          QueryTermsUsed: [query],
+          FallbackReason: 'No products within strict tolerance range',
+          StrictRange: `${targetPrice * (1 - tolerance / 100)} - ${targetPrice * (1 + tolerance / 100)}`,
+          FallbackRange: `${fallbackRange.minPrice} - ${fallbackRange.maxPrice}`
+        }
+      };
+      
+    } catch (error) {
+      console.log(`❌ GOOGLE FALLBACK ERROR: ${error.message}`);
+      return null;
+    }
+  }
+
   // COMPLETELY FIXED: Enhanced validated match with GUARANTEED URL handling
-  async findBestValidatedMatch(results, queryTerms, minPriceParam, maxPriceParam, targetPrice, tolerance) {
+  async findBestValidatedMatch(results, queryTerms, minPriceParam, maxPriceParam, targetPrice, tolerance, priceRange = null) {
     if (this.debugMode) {
       console.log(`🔍 STRICT VALIDATION: Analyzing ${results.length} candidates for "${queryTerms.originalQuery}"`);
     }
@@ -2754,10 +2918,27 @@ class InsuranceItemPricer {
     
     const hasTarget = typeof targetPrice === 'number' && !isNaN(targetPrice) && targetPrice > 0;
 
-    // Compute tolerance band based on the provided tolerance argument
-    const toleranceFraction = Math.max(0, (Number(tolerance) || 0)) / 100;
-    const minPriceBand = hasTarget ? targetPrice * (1 - toleranceFraction) : 0;
-    const maxPriceBand = hasTarget ? targetPrice * (1 + toleranceFraction) : Number.MAX_SAFE_INTEGER;
+    // STRICT: Use calculated price range - NO FALLBACKS
+    let minPriceBand, maxPriceBand;
+    if (hasTarget && priceRange) {
+      minPriceBand = priceRange.minPrice;
+      maxPriceBand = priceRange.maxPrice;
+      console.log(`🎯 STRICT PRICE RANGE: Using calculated range $${minPriceBand} - $${maxPriceBand}`);
+    } else {
+      // STRICT: If no price range, reject immediately
+      console.log(`❌ STRICT REJECTION: No price range available for validation`);
+      return {
+        Status: 'rejected',
+        Price: null,
+        Title: 'Price outside tolerance range',
+        Source: 'Strict Validation',
+        URL: null,
+        Confidence: 0.0,
+        Notes: 'REJECTED: No valid price range for strict validation',
+        MatchedAttributes: {},
+        ValidationErrors: ['No price range available for strict validation']
+      };
+    }
     const stretchUpperFraction = 0.35; // +35% stretch if no in-band verified match
     const stretchMaxPrice = hasTarget ? targetPrice * (1 + stretchUpperFraction) : maxPriceBand;
 
@@ -2783,24 +2964,50 @@ class InsuranceItemPricer {
       }
     })();
 
-    let inBandCandidates = candidates;
-    if (hasTarget) {
-      // Prefer candidates within tolerance band
-      inBandCandidates = candidates.filter(c => c.price >= minPriceBand && c.price <= maxPriceBand);
+    // STRICT: Only accept candidates within the exact price range
+    let inBandCandidates = candidates.filter(c => c.price >= minPriceBand && c.price <= maxPriceBand);
+    
+    console.log(`🎯 STRICT FILTERING: ${candidates.length} total candidates, ${inBandCandidates.length} within range $${minPriceBand} - $${maxPriceBand}`);
+    console.log(`🔍 PRICE RANGE CALCULATION: Target=$${targetPrice}, Tolerance=${tolerance}%, Range=$${minPriceBand}-$${maxPriceBand}`);
+    console.log(`🔍 EXAMPLE: $20 with 10% tolerance = $18.00 - $22.00 (anything outside this range will be REJECTED)`);
 
-      // Apply guardrail for generic descriptions
-      if (isGenericQuery) {
-        const lowerBound = targetPrice * 0.5;
-        inBandCandidates = inBandCandidates.filter(c => c.price >= lowerBound);
+    // STRICT: If no candidates within range, try Google fallback
+    if (inBandCandidates.length === 0) {
+      console.log(`❌ STRICT REJECTION: No candidates within price range $${minPriceBand} - $${maxPriceBand}`);
+      console.log(`🔄 FALLBACK: Attempting Google search for broader results...`);
+      
+      // Try Google fallback with broader search
+      try {
+        const googleFallback = await this.performGoogleFallback(queryTerms.originalQuery, targetPrice, tolerance);
+        if (googleFallback && googleFallback.Price) {
+          console.log(`✅ GOOGLE FALLBACK SUCCESS: Found $${googleFallback.Price} from ${googleFallback.Source}`);
+          return googleFallback;
+        }
+      } catch (error) {
+        console.log(`❌ GOOGLE FALLBACK FAILED: ${error.message}`);
       }
+      
+      // If Google fallback also fails, return rejection
+      return {
+        Status: 'rejected',
+        Price: null,
+        Title: 'No matches within tolerance range',
+        Source: 'Strict Validation + Google Fallback',
+        URL: `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(queryTerms.originalQuery)}`,
+        Confidence: 0.0,
+        Notes: `REJECTED: No products found within price range $${minPriceBand} - $${maxPriceBand}. Google fallback also failed.`,
+        MatchedAttributes: {},
+        ValidationErrors: [`No products within required price range $${minPriceBand} - $${maxPriceBand}`],
+        ValidationStatus: 'STRICT_REJECTED_WITH_GOOGLE_FALLBACK',
+        PriceRange: `${minPriceBand} - ${maxPriceBand}`
+      };
     }
 
     const hasInRange = inBandCandidates.length > 0;
 
-    // FIXED: For insurance replacement, prioritize lowest price from direct URLs
-    // Don't restrict by tolerance bands - we want the cheapest replacement
+    // STRICT: Only use candidates within the exact price range
     let usedStretchBand = false;
-    let selectionPool = candidates; // Use all candidates, already sorted by direct URL + lowest price
+    let selectionPool = inBandCandidates; // Use ONLY candidates within tolerance range
     
     // Select the best candidate (already sorted by direct URL priority + lowest price)
     let selectedCandidate = selectionPool[0] || null;
@@ -2951,7 +3158,7 @@ class InsuranceItemPricer {
     // Direct URL is preferred but not required for "Found" status
     const hasTrustedSource = this.isTrustedSource(bestMatch.source);
     const hasValidPrice = bestMatch.price > 0;
-    const hasGoodMatch = isWithinTolerance || (hasTarget && bestMatch.price >= minPriceBand * 0.8 && bestMatch.price <= maxPriceBand * 1.2);
+    const hasGoodMatch = isWithinTolerance; // STRICT: Only consider within tolerance as good match
 
     const catalogUrl = `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(bestMatch?.title || queryTerms?.originalQuery || '')}`;
     
@@ -2970,9 +3177,10 @@ class InsuranceItemPricer {
       finalUrl = resolvedUrl || catalogUrl;
       finalStatus = 'Found';
     } else if (hasTrustedSource && hasValidPrice) {
-      // Acceptable case: Trusted retailer with valid price (even if price is outside tolerance)
-      finalUrl = resolvedUrl || catalogUrl;
-      finalStatus = 'Found';
+      // STRICT: Even trusted sources must be within tolerance range
+      console.log(`❌ STRICT REJECTION: Trusted source ${bestMatch.source} with price $${bestMatch.price} is outside tolerance range $${minPriceBand} - $${maxPriceBand}`);
+      finalUrl = catalogUrl;
+      finalStatus = 'Estimated'; // Mark as estimated, not found
     } else {
       // Fallback: Use catalog URL and mark as estimated
       finalUrl = catalogUrl;
@@ -3002,34 +3210,68 @@ class InsuranceItemPricer {
     // NO HARDCODED URLs - rely entirely on dynamic search and DirectUrlResolver
     console.log(`🔍 Using dynamic URL resolution only - no hardcoded URLs`);
     
-    // FIXED: Determine status based on trusted source + valid price, not just direct URLs
-    let actualStatus = 'Found'; // Default to Found for trusted sources with valid prices
-    let confidence = 0.8; // Higher confidence for trusted sources
-    let notes = `Found product from trusted retailer: ${bestMatch.source}`;
+    // STRICT: Only approve if within tolerance range
+    let actualStatus = 'Rejected'; // Default to Rejected for strict validation
+    let confidence = 0.0;
+    let notes = `REJECTED: Price $${bestMatch.price} outside tolerance range`;
     
-    // Only mark as Estimated if we have serious quality issues
-    if (!hasTrustedSource) {
-      actualStatus = 'Estimated';
-      confidence = 0.3;
-      notes = `Untrusted source: ${bestMatch.source}`;
+    // Only approve if within strict tolerance range
+    if (isWithinTolerance && hasValidPrice && bestMatch.price > 0) {
+      // AVAILABILITY CHECK: Verify product is actually available
+      if (this.availabilityValidator) {
+        const availabilityCheck = await this.availabilityValidator.validateAvailability({
+          title: bestMatch.title,
+          url: finalUrl,
+          price: bestMatch.price,
+          source: bestMatch.source
+        });
+        
+        if (!availabilityCheck.isAvailable) {
+          console.log(`❌ AVAILABILITY REJECTION: ${availabilityCheck.reason}`);
+          actualStatus = 'Rejected';
+          confidence = 0.0;
+          notes = `REJECTED: Product not available - ${availabilityCheck.reason}`;
+          
+          // Try Google fallback if suggested
+          if (availabilityCheck.shouldFallback) {
+            console.log(`🔄 ATTEMPTING GOOGLE FALLBACK due to availability issues`);
+            try {
+              const googleFallback = await this.availabilityValidator.performGoogleFallback(
+                queryTerms.originalQuery, 
+                targetPrice, 
+                tolerance
+              );
+              if (googleFallback) {
+                console.log(`✅ GOOGLE FALLBACK SUCCESS: ${googleFallback.Notes}`);
+                return googleFallback;
+              }
+            } catch (error) {
+              console.log(`❌ GOOGLE FALLBACK FAILED: ${error.message}`);
+            }
+          }
+        } else {
+          actualStatus = 'Found';
+          confidence = availabilityCheck.confidence || 0.9;
+          notes = `APPROVED: Price $${bestMatch.price} within tolerance range from ${bestMatch.source} (${availabilityCheck.reason})`;
+        }
+      } else {
+        // No availability validator, proceed with approval
+        actualStatus = 'Found';
+        confidence = 0.9;
+        notes = `APPROVED: Price $${bestMatch.price} within tolerance range from ${bestMatch.source}`;
+      }
+    } else if (!hasTrustedSource) {
+      actualStatus = 'Rejected';
+      confidence = 0.0;
+      notes = `REJECTED: Untrusted source ${bestMatch.source}`;
     } else if (!hasValidPrice || bestMatch.price <= 0) {
-      actualStatus = 'Estimated';
-      confidence = 0.4;
-      notes = `No valid price from source: ${bestMatch.source}`;
-    } else if (hasResolvedDirectUrl) {
-      // Best case: direct URL from trusted source
-      confidence = isWithinTolerance ? 0.9 : (isWithinStretch ? 0.8 : 0.7);
-      notes = isWithinTolerance 
-        ? `Direct product URL within tolerance from ${bestMatch.source}`
-        : isWithinStretch 
-        ? `Direct product URL within stretch band from ${bestMatch.source}`
-        : `Direct product URL found from ${bestMatch.source} (price outside tolerance)`;
+      actualStatus = 'Rejected';
+      confidence = 0.0;
+      notes = `REJECTED: No valid price from source ${bestMatch.source}`;
     } else {
-      // Good case: trusted source with valid price (no direct URL needed)
-      confidence = isWithinTolerance ? 0.8 : 0.7;
-      notes = isWithinTolerance
-        ? `Product found from trusted retailer ${bestMatch.source} within tolerance`
-        : `Product found from trusted retailer ${bestMatch.source}`;
+      actualStatus = 'Rejected';
+      confidence = 0.0;
+      notes = `REJECTED: Price $${bestMatch.price} outside tolerance range $${minPriceBand} - $${maxPriceBand}`;
     }
 
     const response = {
@@ -3107,7 +3349,7 @@ class InsuranceItemPricer {
     return response;
   }
   // PERMISSIVE: More flexible validation for general household products
-  async findBestValidatedMatchPermissive(results, queryTerms, minPriceParam, maxPriceParam, targetPrice, tolerance) {
+  async findBestValidatedMatchPermissive(results, queryTerms, minPriceParam, maxPriceParam, targetPrice, tolerance, priceRange = null) {
     if (this.debugMode) {
       console.log(`🔍 PERMISSIVE VALIDATION: Analyzing ${results.length} candidates for "${queryTerms.originalQuery}"`);
     }
@@ -3151,9 +3393,22 @@ class InsuranceItemPricer {
     }
     
     const bestMatch = validCandidates[0];
-    const toleranceFraction = Math.max(0, (Number(tolerance) || 0)) / 100;
-    const minPriceBand = hasTarget ? targetPrice * (1 - toleranceFraction) : 0;
-    const maxPriceBand = hasTarget ? targetPrice * (1 + toleranceFraction) : Number.MAX_SAFE_INTEGER;
+    
+    // STRICT: Final validation - ensure the selected match is within range
+    if (bestMatch.price < minPriceBand || bestMatch.price > maxPriceBand) {
+      console.log(`❌ STRICT REJECTION: Selected match $${bestMatch.price} is outside range $${minPriceBand} - $${maxPriceBand}`);
+      return {
+        Status: 'rejected',
+        Price: null,
+        Title: 'Selected match outside tolerance range',
+        Source: 'Strict Validation',
+        URL: null,
+        Confidence: 0.0,
+        Notes: `REJECTED: Selected match $${bestMatch.price} is outside required range $${minPriceBand} - $${maxPriceBand}`,
+        MatchedAttributes: {},
+        ValidationErrors: [`Selected match outside required price range $${minPriceBand} - $${maxPriceBand}`]
+      };
+    }
     
     // Check if price is within tolerance
     const isWithinTolerance = hasTarget ? (bestMatch.price >= minPriceBand && bestMatch.price <= maxPriceBand) : true;
@@ -3161,21 +3416,50 @@ class InsuranceItemPricer {
     // Resolve URL
     const resolvedUrl = await this.getDirectUrlEnhanced(bestMatch);
     
+    // FINAL STRICT VALIDATION: Double-check that the selected price is within range
+    if (bestMatch.price < minPriceBand || bestMatch.price > maxPriceBand) {
+      console.log(`❌ FINAL STRICT REJECTION: Selected match $${bestMatch.price} is outside range $${minPriceBand} - $${maxPriceBand}`);
+      console.log(`🔄 FALLBACK: Attempting Google search for broader results...`);
+      
+      // Try Google fallback with broader search
+      try {
+        const googleFallback = await this.performGoogleFallback(queryTerms.originalQuery, targetPrice, tolerance);
+        if (googleFallback && googleFallback.Price) {
+          console.log(`✅ GOOGLE FALLBACK SUCCESS: Found $${googleFallback.Price} from ${googleFallback.Source}`);
+          return googleFallback;
+        }
+      } catch (error) {
+        console.log(`❌ GOOGLE FALLBACK FAILED: ${error.message}`);
+      }
+      
+      return {
+        Status: 'rejected',
+        Price: null,
+        Title: 'Price outside tolerance range',
+        Source: 'Strict Validation + Google Fallback',
+        URL: `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(queryTerms.originalQuery)}`,
+        Confidence: 0.0,
+        Notes: `REJECTED: Selected price $${bestMatch.price} is outside required range $${minPriceBand} - $${maxPriceBand}. Google fallback also failed.`,
+        MatchedAttributes: {},
+        ValidationErrors: [`Price $${bestMatch.price} outside tolerance range $${minPriceBand} - $${maxPriceBand}`],
+        ValidationStatus: 'STRICT_REJECTED_WITH_GOOGLE_FALLBACK',
+        PriceRange: `${minPriceBand} - ${maxPriceBand}`
+      };
+    }
+
     return {
       Price: bestMatch.price,
       Currency: "USD",
       Source: bestMatch.source,
       URL: resolvedUrl || '',
-      // INTELLIGENT STATUS: Return Found only when we have a real product match from trusted retailer
-      Status: isWithinTolerance ? 'Found' : 'Estimated',
-      Pricer: "AI-Enhanced",
+      // STRICT STATUS: Only return Found if within strict tolerance range
+      Status: 'Found', // We already validated it's within range above
+      Pricer: "AI-Enhanced-Strict",
       Title: bestMatch.title,
       Brand: "Unknown",
       Model: "Unknown",
-      Confidence: isWithinTolerance ? 0.8 : 0.6,
-      Notes: isWithinTolerance 
-        ? `Match found within ${Math.round(toleranceFraction * 100)}% tolerance using permissive validation`
-        : `Match found outside tolerance using permissive validation`,
+      Confidence: 1.0, // High confidence for strict validation
+      Notes: `APPROVED: Match found within strict tolerance range $${minPriceBand} - $${maxPriceBand}`,
       MatchedAttributes: {
         Brand: "unknown",
         Model: "unknown",
@@ -3184,6 +3468,8 @@ class InsuranceItemPricer {
         Color: "unknown",
         Material: "unknown"
       },
+      ValidationStatus: 'STRICT_APPROVED',
+      PriceRange: `${minPriceBand} - ${maxPriceBand}`,
       Trace: {
         QueryTermsUsed: [queryTerms.originalQuery],
         CandidatesChecked: validCandidates.length,
@@ -4726,11 +5012,19 @@ Return ONLY a valid JSON response with this exact format:
   }
 
   // Keep existing methods for backward compatibility
-  async trySerpAPISmartFast(query, min = 0, max = 99999, targetPrice = null, tolerance = 50) {
+  async trySerpAPISmartFast(query, min = 0, max = 99999, targetPrice = null, tolerance) {
+    // Use only the provided tolerance - no defaults
+    if (!tolerance || tolerance <= 0) {
+      throw new Error('Tolerance percentage is required and must be greater than 0');
+    }
     return await this.searchWithProductValidation(query, min, max, targetPrice, tolerance);
   }
 
-  async performSearchSmartFast(query, min, max, targetPrice, tolerance = 50) {
+  async performSearchSmartFast(query, min, max, targetPrice, tolerance) {
+    // Use only the provided tolerance - no defaults
+    if (!tolerance || tolerance <= 0) {
+      throw new Error('Tolerance percentage is required and must be greater than 0');
+    }
     const results = await this.performValidatedSearch(query, TIMEOUT_CONFIG.fast);
     return results || [];
   }
@@ -4916,9 +5210,8 @@ Return ONLY a valid JSON response with this exact format:
           // Apply price filter via SerpAPI tbs when we have target price
           let tbsParam;
           if (targetPrice && typeof targetPrice === 'number' && targetPrice > 0) {
-            // Use a reasonable default tolerance of 50% for exact product search
-            const defaultTolerance = 50;
-            const tolFrac = defaultTolerance / 100;
+            // Use the provided tolerance for exact product search
+            const tolFrac = tolerance / 100;
             const minP = Math.max(0, Math.floor(targetPrice * (1 - tolFrac)));
             const maxP = Math.max(minP + 1, Math.ceil(targetPrice * (1 + tolFrac)));
             tbsParam = `mr:1,price:1,ppr_min:${minP},ppr_max:${maxP}`;
@@ -6224,9 +6517,8 @@ Return ONLY a valid JSON response with this exact format:
           // Apply price filter via tbs when we have target price
           let tbsParamAlt;
           if (targetPrice && typeof targetPrice === 'number' && targetPrice > 0) {
-            // Use a reasonable default tolerance of 50% for alternative search
-            const defaultTolerance = 50;
-            const tolFracAlt = defaultTolerance / 100;
+            // Use the provided tolerance for alternative search
+            const tolFracAlt = tolerance / 100;
             const minPA = Math.max(0, Math.floor(targetPrice * (1 - tolFracAlt)));
             const maxPA = Math.max(minPA + 1, Math.ceil(targetPrice * (1 + tolFracAlt)));
             tbsParamAlt = `mr:1,price:1,ppr_min:${minPA},ppr_max:${maxPA}`;
@@ -6837,7 +7129,11 @@ Return ONLY a valid JSON response with this exact format:
     return `$${priceNum.toFixed(2)}`;
   }
   // ENHANCED: Intelligent estimation using AI-like reasoning and market knowledge
-  generateFastIntelligentEstimate(query, targetPrice = null, tolerance = 10) {
+  generateFastIntelligentEstimate(query, targetPrice = null, tolerance) {
+    // Use only the provided tolerance - no defaults
+    if (!tolerance || tolerance <= 0) {
+      throw new Error('Tolerance percentage is required and must be greater than 0');
+    }
     console.log(`🧠 INTELLIGENT ESTIMATION: Processing "${query}" with target price $${targetPrice}`);
     
     const desc = query.toLowerCase();
@@ -7059,22 +7355,79 @@ Return ONLY a valid JSON response with this exact format:
         estimatedPrice = 100; // Product with specifications
         explanation = 'Product with specifications estimate';
       } else {
-        estimatedPrice = 75; // Generic product
-        explanation = 'Generic product estimate based on query complexity';
+        // STRICT: Don't fall back to generic price - reject instead
+        console.log(`❌ STRICT REJECTION: Cannot determine product type for "${query}" - no specific patterns matched`);
+        return {
+          Price: null,
+          Currency: "USD",
+          Source: "AI-Enhanced",
+          URL: "https://example.com",
+          Status: "Rejected",
+          Pricer: "AI-Enhanced",
+          Title: query,
+          Brand: "Unknown",
+          Model: "Unknown",
+          Confidence: 0.0,
+          Notes: `REJECTED: Cannot determine product type for "${query}" - insufficient product information`,
+          MatchedAttributes: {
+            Brand: "unknown",
+            Model: "unknown",
+            UPC_EAN: "unknown",
+            Size_Pack: "unknown",
+            Color: "unknown",
+            Material: "unknown"
+          },
+          Trace: {
+            QueryTermsUsed: [query],
+            CandidatesChecked: 0,
+            TrustedSkipped: [],
+            UntrustedSkipped: [],
+            Validation: "insufficient_product_info"
+          }
+        };
       }
     }
     
-    // If we have a target price, adjust our estimate to be within tolerance
-    if (targetPrice && estimatedPrice) {
-      const currentDiff = Math.abs(estimatedPrice - targetPrice) / targetPrice;
-      if (currentDiff > tolerance / 100) {
-        // Adjust estimate to be within tolerance of target price
-        const adjustment = targetPrice > estimatedPrice ? 
-          Math.min(targetPrice * (tolerance / 100), targetPrice - estimatedPrice) :
-          Math.max(-targetPrice * (tolerance / 100), targetPrice - estimatedPrice);
-        estimatedPrice = Math.round(estimatedPrice + adjustment);
-        explanation += ` (adjusted to target price within ${tolerance}% tolerance)`;
+    // STRICT VALIDATION: Check if estimate is within tolerance range
+    if (targetPrice && estimatedPrice && tolerance) {
+      const minPrice = targetPrice * (1 - tolerance / 100);
+      const maxPrice = targetPrice * (1 + tolerance / 100);
+      
+      console.log(`🔍 STRICT VALIDATION: Estimated price $${estimatedPrice} vs Range $${minPrice} - $${maxPrice}`);
+      
+      if (estimatedPrice < minPrice || estimatedPrice > maxPrice) {
+        console.log(`❌ STRICT REJECTION: Estimated price $${estimatedPrice} is outside tolerance range $${minPrice} - $${maxPrice}`);
+        return {
+          Price: estimatedPrice,
+          Currency: "USD",
+          Source: "AI-Enhanced",
+          URL: "https://example.com",
+          Status: "Rejected",
+          Pricer: "AI-Enhanced",
+          Title: query,
+          Brand: "Unknown",
+          Model: "Unknown",
+          Confidence: 0.0,
+          Notes: `REJECTED: Price $${estimatedPrice} outside ${tolerance}% tolerance range (${minPrice} - ${maxPrice})`,
+          MatchedAttributes: {
+            Brand: "unknown",
+            Model: "unknown",
+            UPC_EAN: "unknown",
+            Size_Pack: "unknown",
+            Color: "unknown",
+            Material: "unknown"
+          },
+          Trace: {
+            QueryTermsUsed: [query],
+            CandidatesChecked: 0,
+            TrustedSkipped: [],
+            UntrustedSkipped: [],
+            Validation: "strict_rejection"
+          }
+        };
       }
+      
+      console.log(`✅ STRICT APPROVAL: Estimated price $${estimatedPrice} is within tolerance range`);
     }
     
     // Ensure we have a reasonable price
@@ -7263,151 +7616,6 @@ Return ONLY a valid JSON response with this exact format:
     return catalogPatterns.some(pattern => url.includes(pattern));
   }
 
-  /**
-   * ENHANCED: Robust search with fallback mechanisms as suggested by ChatGPT
-   * Reliably return direct retailer URL and price within $80-$160, avoiding Google Shopping links
-   * If nothing is found, try trusted-retailer site search, then widen the band slightly
-   */
-  async findBestPriceWithProductAPI(query, maxPrice = null) {
-    try {
-      console.log(`🔍 ROBUST SEARCH: "${query}" with target price: $${maxPrice}`);
-      
-      // CRITICAL FIX: Always try enhanced SerpAPI search first for ALL products
-      console.log(`🚨 PRODUCT API FUNCTION CALLED: findBestPriceWithProductAPI for query="${query}"`);
-      console.log(`🎯 ENHANCED SEARCH: Trying SerpAPI Google Shopping for "${query}"`);
-      
-      const serpApiResult = await this.searchGoogleShoppingEnhanced(query, maxPrice);
-      if (serpApiResult && serpApiResult.found) {
-        console.log(`✅ SerpAPI found accurate match: ${serpApiResult.source} - $${serpApiResult.price}`);
-        return serpApiResult;
-      }
-      
-      // FALLBACK: For specific problematic items, try site-restricted searches
-      console.log(`🔍 TARGETED RESOLVER CHECK: query="${query}"`);
-      
-      const lowerQuery = query.toLowerCase();
-      console.log(`🔍 TARGETED RESOLVER CHECK: lowerQuery="${lowerQuery}"`);
-      
-      const hintsBissell = lowerQuery.includes('bissell') || lowerQuery.includes('rug shampooer') || lowerQuery.includes('carpet cleaner');
-      const hintsCleaningTools = lowerQuery.includes('cleaning tools') || lowerQuery.includes('cleaning/ laundry supplies') || lowerQuery.includes('broom') || lowerQuery.includes('mop') || lowerQuery.includes('dustpan');
-      const hintsStorage = lowerQuery.includes('storage') || lowerQuery.includes('storage containers') || lowerQuery.includes('bin');
-      const hintsMiniFridge = lowerQuery.includes('mini fridge') || lowerQuery.includes('compact refrigerator');
-      const hintsSewing = lowerQuery.includes('sewing') || lowerQuery.includes('sewing supplies') || lowerQuery.includes('craft supplies') || lowerQuery.includes('fabric');
-      
-      console.log(`🔍 HINTS: bissell=${hintsBissell} cleaning=${hintsCleaningTools} storage=${hintsStorage} miniFridge=${hintsMiniFridge} sewing=${hintsSewing}`);
-      console.log(`🔍 DEBUG PATTERNS: 
-        - cleaning tools: ${lowerQuery.includes('cleaning tools')}
-        - cleaning/ laundry supplies: ${lowerQuery.includes('cleaning/ laundry supplies')}
-        - craft supplies: ${lowerQuery.includes('craft supplies')}
-        - sewing: ${lowerQuery.includes('sewing')}
-        - sewing supplies: ${lowerQuery.includes('sewing supplies')}`);
-      
-      if (hintsBissell || hintsCleaningTools || hintsStorage || hintsMiniFridge || hintsSewing) {
-        console.log(`🎯 TARGETED RESOLVER: Detected ${query}, trying site-restricted searches NEXT...`);
-        
-        // Define search domains based on item type
-        let searchDomains = [];
-        if (hintsBissell) {
-          searchDomains = ['bissell.com', 'walmart.com', 'target.com'];
-        } else if (hintsCleaningTools) {
-          searchDomains = ['target.com', 'walmart.com', 'homedepot.com', 'lowes.com', 'bestbuy.com'];
-        } else if (hintsStorage) {
-          searchDomains = ['target.com', 'walmart.com', 'bestbuy.com', 'costco.com'];
-        } else if (hintsMiniFridge) {
-          searchDomains = ['target.com', 'walmart.com', 'bestbuy.com', 'costco.com'];
-        } else if (hintsSewing) {
-          searchDomains = ['target.com', 'walmart.com', 'homedepot.com', 'lowes.com', 'bestbuy.com'];
-        }
-        
-        console.log(`🎯 TARGETED RESOLVER: Using domains: ${searchDomains.join(', ')}`);
-        
-        // Try site-restricted searches FIRST
-        for (const domain of searchDomains) {
-          try {
-            console.log(`🔍 Trying site-restricted search on ${domain} for "${query}"`);
-            // Use more specific search terms for better results
-            let searchQuery = query;
-            if (hintsCleaningTools) {
-              searchQuery = 'cleaning tools broom mop dustpan';
-            } else if (hintsSewing) {
-              searchQuery = 'sewing supplies craft supplies fabric thread';
-            }
-            const siteResults = await this.searchRetailerSiteForDirectUrl(searchQuery, domain);
-            console.log(`🔍 Site-restricted search result on ${domain}: ${siteResults || 'null'}`);
-            if (siteResults && this.isDirectProductUrl(siteResults)) {
-              console.log(`✅ Found direct product URL on ${domain}: ${siteResults}`);
-              // Return early with the direct URL result in findBestPriceWithProductAPI format
-              return {
-                price: maxPrice || null,
-                source: domain.replace('.com', ''),
-                url: siteResults,
-                title: query,
-                status: 'Found',
-                matchQuality: 'Exact Match',
-                confidence: 0.9,
-                notes: `Direct product URL found on ${domain}`,
-                validation: "site_restricted"
-              };
-            }
-          } catch (error) {
-            console.log(`❌ Site-restricted search failed on ${domain}: ${error.message}`);
-          }
-        }
-        console.log(`❌ TARGETED RESOLVER: No direct URLs found for ${query}, falling back to regular search`);
-      } else {
-        console.log(`ℹ️ TARGETED RESOLVER: No hints matched for "${query}", proceeding with regular search`);
-      }
-      
-      // Calculate price range with tolerance
-      const minPrice = maxPrice ? maxPrice * 0.5 : 0; // 50% below
-      const maxTolerancePrice = maxPrice ? maxPrice * 1.5 : Infinity; // 50% above
-      
-      console.log(`💰 Price range: $${minPrice} - $${maxTolerancePrice}`);
-      
-      // Step 1: Try Google Shopping with Product API approach
-      const productApiResult = await this.searchWithProductAPI(query, minPrice, maxTolerancePrice);
-      if (productApiResult) {
-        console.log(`✅ Product API found: ${productApiResult.source} - $${productApiResult.price}`);
-        return productApiResult;
-      }
-      
-      console.log(`⚠️ Product API failed, trying trusted retailer search...`);
-      
-      // Step 2: Try trusted retailer site search
-      const trustedRetailerResult = await this.searchTrustedRetailers(query, minPrice, maxTolerancePrice);
-      if (trustedRetailerResult) {
-        console.log(`✅ Trusted retailer search found: ${trustedRetailerResult.source} - $${trustedRetailerResult.price}`);
-        return trustedRetailerResult;
-      }
-      
-      console.log(`⚠️ Trusted retailer search failed, widening price band...`);
-      
-      // Step 3: Widen the price band slightly (60% below to 60% above)
-      const widerMinPrice = maxPrice ? maxPrice * 0.4 : 0;
-      const widerMaxPrice = maxPrice ? maxPrice * 1.6 : Infinity;
-      
-      console.log(`💰 Wider price range: $${widerMinPrice} - $${widerMaxPrice}`);
-      
-      const widerProductApiResult = await this.searchWithProductAPI(query, widerMinPrice, widerMaxPrice);
-      if (widerProductApiResult) {
-        console.log(`✅ Wider search found: ${widerProductApiResult.source} - $${widerProductApiResult.price}`);
-        return widerProductApiResult;
-      }
-      
-      const widerTrustedRetailerResult = await this.searchTrustedRetailers(query, widerMinPrice, widerMaxPrice);
-      if (widerTrustedRetailerResult) {
-        console.log(`✅ Wider trusted retailer search found: ${widerTrustedRetailerResult.source} - $${widerTrustedRetailerResult.price}`);
-        return widerTrustedRetailerResult;
-      }
-      
-      console.log(`❌ No results found with any method`);
-      return null;
-      
-    } catch (error) {
-      console.error(`❌ Error in findBestPriceWithProductAPI:`, error.message);
-      return null;
-    }
-  }
   
   /**
    * Search using Product API approach
