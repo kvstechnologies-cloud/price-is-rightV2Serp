@@ -1235,7 +1235,7 @@ export class EnhancedProcessing {
                 return;
             }
             
-            // Calculate summary statistics using the same format as main app.js
+            // Calculate summary statistics - CORRECTED: Only count actual "Found" status
             const totalItems = resultsArray.length;
             const foundPrices = resultsArray.filter(item => {
                 const status = item['Search Status'] || item.Status || item.status;
@@ -1246,8 +1246,10 @@ export class EnhancedProcessing {
                 const status = item['Search Status'] || item.Status || item.status;
                 return (status || '').toString().toLowerCase() === 'estimated';
             }).length;
-            const denom = foundPrices + estimatedPrices;
-            const successRate = denom > 0 ? Math.round((foundPrices / denom) * 100) : 0;
+            
+            // CORRECTED: Success rate = Found items / (Found + Estimated) * 100
+            const totalProcessedItems = foundPrices + estimatedPrices;
+            const successRate = totalProcessedItems > 0 ? Math.round((foundPrices / totalProcessedItems) * 100) : 0;
             
             // Calculate actual processing time in seconds
             let processingTimeSeconds = 0;
@@ -1266,7 +1268,7 @@ export class EnhancedProcessing {
                 processingTimeSeconds
             });
             
-            // Update the summary cards with new compact structure
+            // Update the summary cards with new compact structure - use actual foundPrices
             this.updateCompactSummaryCards(totalItems, foundPrices, successRate, processingTimeSeconds);
             
             console.log('✅ Summary cards updated successfully');

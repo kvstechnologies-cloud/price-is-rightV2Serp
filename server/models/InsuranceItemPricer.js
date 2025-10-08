@@ -131,6 +131,11 @@ class InsuranceItemPricer {
       this.researchTracker = new ResearchTracker();
     }
     
+    // Enhanced URL extraction (Zyte integration removed due to package issues)
+    // Using improved regex methods instead
+    this.zyteClient = null;
+    console.log('✅ Using enhanced regex URL extraction (Zyte integration disabled)');
+    
     // Initialize DirectUrlResolver for "Found" status with direct URLs
     try {
       this.directUrlResolver = new DirectUrlResolver();
@@ -149,9 +154,17 @@ class InsuranceItemPricer {
       this.availabilityValidator = null;
     }
     
-    this.serpApiKey = process.env.SERPAPI_KEY;
+    // Check for SERP API key with multiple possible names
+    this.serpApiKey = process.env.SERPAPI_KEY || process.env.SERP_API_KEY || process.env.SERPAPIKEY;
     // Use google search engine with shopping parameters to get direct retailer URLs
     this.searchEngine = 'google';
+    
+    // Debug environment variables
+    console.log('🔍 Environment variables check:');
+    console.log(`   SERPAPI_KEY: ${process.env.SERPAPI_KEY ? 'FOUND' : 'NOT FOUND'}`);
+    console.log(`   SERP_API_KEY: ${process.env.SERP_API_KEY ? 'FOUND' : 'NOT FOUND'}`);
+    console.log(`   SERPAPIKEY: ${process.env.SERPAPIKEY ? 'FOUND' : 'NOT FOUND'}`);
+    console.log(`   Final key: ${this.serpApiKey ? 'FOUND' : 'NOT FOUND'}`);
     
     // HIGH-PERFORMANCE: Enhanced caching for large files
     this.trustedSourceMap = new Map();
@@ -7821,33 +7834,569 @@ Return ONLY a valid JSON response with this exact format:
   }
   
   /**
-   * Search retailer directly
+   * Search retailer using SERP API + enhanced regex hybrid approach
    */
   async searchRetailerDirect(searchUrl, retailer, minPrice, maxPrice) {
+    const startTime = Date.now();
+    console.log(`🔍 Starting SERP hybrid search for ${retailer}: ${searchUrl}`);
+    
     try {
-      const response = await axios.get(searchUrl, { timeout: 25000 });
+      // STEP 1: Try SERP API Google Shopping search first
+      console.log(`⚡ Step 1: Trying SERP API Google Shopping search for ${retailer}`);
+      const serpResults = await this.searchWithSerpApi(searchUrl, retailer, minPrice, maxPrice);
       
-      // Basic price extraction from retailer page
-      // This is a simplified version - in production you'd want more sophisticated parsing
-      const priceMatch = response.data.match(/\$(\d+(?:\.\d{2})?)/g);
-      if (priceMatch) {
-        const prices = priceMatch.map(p => parseFloat(p.replace('$', '')));
-        const validPrices = prices.filter(p => p >= minPrice && p <= maxPrice);
-        
-        if (validPrices.length > 0) {
-          const lowestPrice = Math.min(...validPrices);
-          return {
-            price: lowestPrice,
-            url: searchUrl
-          };
+      if (serpResults) {
+        const serpTime = Date.now() - startTime;
+        console.log(`✅ SERP API method succeeded in ${serpTime}ms for ${retailer}`);
+        return serpResults;
+      }
+      
+      // STEP 2: Fallback to enhanced regex method
+      console.log(`🔄 Step 2: SERP API failed, trying enhanced regex extraction for ${retailer}`);
+      const regexResults = await this.searchWithEnhancedRegex(searchUrl, retailer, minPrice, maxPrice);
+      
+      if (regexResults) {
+        const regexTime = Date.now() - startTime;
+        console.log(`✅ Enhanced regex method succeeded in ${regexTime}ms for ${retailer}`);
+        return regexResults;
+      }
+      
+      // STEP 3: Final fallback to basic search URL with price extraction
+      console.log(`⚠️ Step 3: Both methods failed, using search URL fallback for ${retailer}`);
+      return await this.searchWithFallbackMethod(searchUrl, retailer, minPrice, maxPrice);
+      
+    } catch (error) {
+      console.log(`❌ Error in SERP hybrid search for ${retailer}:`, error.message);
+      return null;
+    }
+  }
+
+  /**
+   * SERP API method using Google Shopping search
+   */
+  async searchWithSerpApi(searchUrl, retailer, minPrice, maxPrice) {
+    try {
+      if (!this.serpApiKey) {
+        console.log(`⚠️ No SERP API key available for ${retailer}`);
+        return null;
+      }
+
+      // Extract search query from the search URL
+      const urlObj = new URL(searchUrl);
+      const query = urlObj.searchParams.get('q') || urlObj.searchParams.get('searchTerm') || urlObj.searchParams.get('st') || 'product';
+      
+      console.log(`🔍 SERP API searching Google Shopping for: "${query}"`);
+      
+      // Use Google Shopping search via SERP API (simplified version)
+      const serpResults = await this.searchGoogleShoppingSimple(query, minPrice, maxPrice);
+      
+      if (!serpResults || serpResults.length === 0) {
+        console.log(`⚠️ No SERP results found for ${retailer}`);
+        return null;
+      }
+      
+      console.log(`🔍 SERP API found ${serpResults.length} results for ${retailer}`);
+      
+      // Filter results for the specific retailer and price range
+        const retailerResults = serpResults.filter(result => {
+          const url = result.link || result.url || '';
+          const price = result.price || result.price_raw || 0;
+          const source = (result.source || '').toLowerCase();
+          
+          // Check for trusted retailer patterns in URL and source
+          const retailerPatterns = [
+            retailer.replace('.com', ''),
+            'walmart', 'amazon', 'target', 'best buy', 'home depot', 'lowes',
+            'costco', 'sam\'s club', 'kohl\'s', 'macy\'s', 'nordstrom',
+            'wayfair', 'staples', 'office depot', 'homedepot', 'ace hardware', 
+            'menards', 'barnes noble', 'gamestop', 'petco', 'petsmart', 
+            'dick\'s sporting goods', 'rei', 'cabela\'s', 'bass pro shops'
+          ];
+          
+          const isRetailerMatch = retailerPatterns.some(pattern => 
+            url.includes(pattern) || source.includes(pattern)
+          );
+          const isPriceInRange = price >= minPrice && price <= maxPrice;
+          
+          console.log(`🔍 Checking result: ${url} - Price: $${price} - Source: ${source} - Retailer match: ${isRetailerMatch} - Price in range: ${isPriceInRange}`);
+          
+          return isRetailerMatch && isPriceInRange;
+        });
+      
+      if (retailerResults.length === 0) {
+        console.log(`⚠️ No ${retailer} results found in price range $${minPrice}-$${maxPrice}`);
+        return null;
+      }
+      
+      // Get the best result (lowest price)
+      const bestResult = retailerResults.reduce((best, current) => {
+        const currentPrice = current.price || current.price_raw || 0;
+        const bestPrice = best.price || best.price_raw || 0;
+        return currentPrice < bestPrice ? current : best;
+      });
+      
+      const finalPrice = bestResult.price || bestResult.price_raw || 0;
+      const productId = bestResult.product_id;
+      
+      console.log(`✅ SERP API found best result with price $${finalPrice}, product_id: ${productId}`);
+      
+      // Try to get direct retailer URL using product API
+        if (productId && bestResult.immersive_product_page_token) {
+          console.log(`🔍 Attempting to get direct URL for product_id: ${productId}`);
+          const directUrl = await this.getDirectRetailerUrl(productId, retailer, bestResult.immersive_product_page_token);
+          if (directUrl) {
+            console.log(`✅ Got direct retailer URL: ${directUrl}`);
+            return {
+              price: finalPrice,
+              url: directUrl
+            };
+          }
+        }
+      
+      // Fallback to Google Shopping URL if direct URL not available
+      const fallbackUrl = bestResult.link || bestResult.url || '';
+      console.log(`⚠️ Using Google Shopping URL as fallback: ${fallbackUrl}`);
+      
+      return {
+        price: finalPrice,
+        url: fallbackUrl
+      };
+      
+    } catch (error) {
+      console.log(`⚠️ SERP API method failed for ${retailer}:`, error.message);
+      return null;
+    }
+  }
+
+  /**
+   * Enhanced regex method using improved patterns with anti-bot protection
+   */
+  async searchWithEnhancedRegex(searchUrl, retailer, minPrice, maxPrice) {
+    try {
+      const headers = this.getAntiBotHeaders();
+      const response = await axios.get(searchUrl, { 
+        timeout: 15000,
+        headers: headers,
+        maxRedirects: 5
+      });
+      const directProductUrls = this.extractDirectProductUrls(response.data, retailer);
+      
+      console.log(`🔍 Enhanced regex found ${directProductUrls.length} URLs for ${retailer}`);
+      if (directProductUrls.length > 0) {
+        console.log(`🔍 Sample URLs:`, directProductUrls.slice(0, 3));
+      }
+      
+      if (directProductUrls.length === 0) {
+        console.log(`⚠️ No direct product URLs found in ${retailer} search results`);
+        return null;
+      }
+      
+      // Try to find a product with valid price
+      for (const productUrl of directProductUrls) {
+        try {
+          const productResponse = await axios.get(productUrl, { 
+            timeout: 12000,
+            headers: this.getAntiBotHeaders(),
+            maxRedirects: 5
+          });
+          const priceMatch = productResponse.data.match(/\$(\d+(?:\.\d{2})?)/g);
+          
+          if (priceMatch) {
+            const prices = priceMatch.map(p => parseFloat(p.replace('$', '')));
+            const validPrices = prices.filter(p => p >= minPrice && p <= maxPrice);
+            
+            if (validPrices.length > 0) {
+              const lowestPrice = Math.min(...validPrices);
+              console.log(`✅ Quick method found: ${productUrl} with price $${lowestPrice}`);
+              return {
+                price: lowestPrice,
+                url: productUrl
+              };
+            }
+          }
+        } catch (productError) {
+          continue;
         }
       }
       
       return null;
     } catch (error) {
-      console.log(`⚠️ Error searching ${retailer}:`, error.message);
+      console.log(`⚠️ Quick method failed for ${retailer}:`, error.message);
       return null;
     }
+  }
+
+
+  /**
+   * Fallback method using search URL with anti-bot protection
+   */
+  async searchWithFallbackMethod(searchUrl, retailer, minPrice, maxPrice) {
+    try {
+      const headers = this.getAntiBotHeaders();
+      const response = await axios.get(searchUrl, { 
+        timeout: 20000,
+        headers: headers,
+        maxRedirects: 5
+      });
+      const priceMatch = response.data.match(/\$(\d+(?:\.\d{2})?)/g);
+      
+      console.log(`🔍 Fallback method found ${priceMatch ? priceMatch.length : 0} price matches`);
+      if (priceMatch && priceMatch.length > 0) {
+        console.log(`🔍 Sample prices:`, priceMatch.slice(0, 5));
+        const prices = priceMatch.map(p => parseFloat(p.replace('$', '')));
+        const validPrices = prices.filter(p => p >= minPrice && p <= maxPrice);
+        
+        console.log(`🔍 Valid prices in range $${minPrice}-$${maxPrice}:`, validPrices);
+        
+        if (validPrices.length > 0) {
+          const lowestPrice = Math.min(...validPrices);
+          console.log(`✅ Fallback method using search URL: ${searchUrl} with price $${lowestPrice}`);
+          return {
+            price: lowestPrice,
+            url: searchUrl
+          };
+        } else {
+          console.log(`⚠️ No prices found in range $${minPrice}-$${maxPrice}`);
+        }
+      } else {
+        console.log(`⚠️ No price patterns found in response`);
+      }
+      
+      return null;
+    } catch (error) {
+      console.log(`⚠️ Fallback method failed for ${retailer}:`, error.message);
+      return null;
+    }
+  }
+
+
+  /**
+   * Extract direct product URLs from search results HTML (fallback method)
+   */
+  extractDirectProductUrls(html, retailer) {
+    const urls = [];
+    
+    try {
+      // Enhanced retailer-specific URL extraction patterns
+      const patterns = {
+        'walmart.com': [
+          /href="([^"]*\/ip\/[^"]*\/\d+[^"]*)"/g,
+          /data-testid="item-stack"[^>]*href="([^"]*\/ip\/[^"]*\/\d+[^"]*)"/g
+        ],
+        'amazon.com': [
+          /href="([^"]*\/dp\/[A-Z0-9]+[^"]*)"/g,
+          /data-asin="[^"]*"[^>]*href="([^"]*\/dp\/[A-Z0-9]+[^"]*)"/g
+        ],
+        'target.com': [
+          /href="([^"]*\/p\/[^"]*\/[A-Z0-9\-]+[^"]*)"/g,
+          /data-test="product-details"[^>]*href="([^"]*\/p\/[^"]*\/[A-Z0-9\-]+[^"]*)"/g
+        ],
+        'homedepot.com': [
+          /href="([^"]*\/p\/[^"]*\/\d+[^"]*)"/g,
+          /class="product-pod"[^>]*href="([^"]*\/p\/[^"]*\/\d+[^"]*)"/g
+        ],
+        'lowes.com': [
+          /href="([^"]*\/pd\/[^"]*\/\d+[^"]*)"/g,
+          /class="product-tile"[^>]*href="([^"]*\/pd\/[^"]*\/\d+[^"]*)"/g
+        ],
+        'bestbuy.com': [
+          /href="([^"]*\/site\/[^"]*\/\d+[^"]*)"/g,
+          /class="product-item"[^>]*href="([^"]*\/site\/[^"]*\/\d+[^"]*)"/g
+        ]
+      };
+      
+      const retailerPatterns = patterns[retailer] || [];
+      retailerPatterns.forEach(pattern => {
+        let match;
+        while ((match = pattern.exec(html)) !== null) {
+          let url = match[1];
+          // Convert relative URLs to absolute
+          if (url.startsWith('/')) {
+            url = `https://www.${retailer}${url}`;
+          } else if (!url.startsWith('http')) {
+            url = `https://www.${retailer}/${url}`;
+          }
+          urls.push(url);
+        }
+      });
+      
+      // Remove duplicates and limit to first 5 results
+      return [...new Set(urls)].slice(0, 5);
+    } catch (error) {
+      console.log(`⚠️ Error extracting URLs from ${retailer}:`, error.message);
+      return [];
+    }
+  }
+
+  /**
+   * Normalize URL to absolute format
+   */
+  normalizeUrl(url, retailer) {
+    if (!url) return '';
+    
+    try {
+      if (url.startsWith('/')) {
+        return `https://www.${retailer}${url}`;
+      } else if (!url.startsWith('http')) {
+        return `https://www.${retailer}/${url}`;
+      }
+      return url;
+    } catch (error) {
+      console.log(`⚠️ Error normalizing URL: ${url}`, error.message);
+      return url;
+    }
+  }
+
+  /**
+   * Extract price from text
+   */
+  extractPriceFromText(priceText) {
+    if (!priceText) return null;
+    
+    const priceMatch = priceText.match(/\$?(\d+(?:\.\d{2})?)/);
+    return priceMatch ? parseFloat(priceMatch[1]) : null;
+  }
+
+  /**
+   * Simplified Google Shopping search without excessive exclusions
+   */
+  async searchGoogleShoppingSimple(query, minPrice = null, maxPrice = null) {
+    try {
+      const serpApiKey = process.env.SERPAPI_KEY;
+      if (!serpApiKey) {
+        console.log('❌ SERPAPI_KEY not found');
+        return null;
+      }
+      
+      const url = 'https://serpapi.com/search.json';
+      
+      // No exclusions for now - let's get any results first
+      const enhancedQuery = query;
+      console.log(`🔍 [searchGoogleShoppingSimple] Query: ${enhancedQuery}`);
+      
+      const params = {
+        engine: 'google',
+        q: enhancedQuery,
+        tbm: 'shop',
+        num: 50,
+        gl: 'us',
+        hl: 'en',
+        api_key: serpApiKey
+      };
+      
+      console.log(`🔍 Searching Google Shopping: ${query}`);
+      
+      const response = await axios.get(url, { params });
+      
+      console.log(`🔍 SERP API Response Status: ${response.status}`);
+      console.log(`🔍 SERP API Response Keys:`, Object.keys(response.data || {}));
+      
+      if (response.data && response.data.error) {
+        console.log('❌ SERP API Error:', response.data.error);
+        return [];
+      }
+      
+      if (!response.data || !response.data.shopping_results) {
+        console.log('⚠️ No shopping results in SERP response');
+        console.log('🔍 Available sections:', Object.keys(response.data || {}));
+        if (response.data && response.data.organic_results) {
+          console.log(`🔍 Found ${response.data.organic_results.length} organic results instead`);
+        }
+        return [];
+      }
+      
+        const results = response.data.shopping_results.map(item => {
+          console.log(`🔍 Raw item:`, JSON.stringify(item, null, 2));
+          return {
+            title: item.title,
+            price: item.price ? parseFloat(item.price.replace(/[^0-9.]/g, '')) : 0,
+            price_raw: item.price,
+            link: item.link || item.url || item.product_link,
+            url: item.link || item.url || item.product_link,
+            source: item.source,
+            thumbnail: item.thumbnail,
+            product_id: item.product_id,
+            immersive_product_page_token: item.immersive_product_page_token
+          };
+        });
+      
+      console.log(`✅ Found ${results.length} Google Shopping results`);
+      
+      // Filter by price range if specified
+      if (minPrice !== null || maxPrice !== null) {
+        const filteredResults = results.filter(item => {
+          const price = item.price || 0;
+          const minCheck = minPrice === null || price >= minPrice;
+          const maxCheck = maxPrice === null || price <= maxPrice;
+          return minCheck && maxCheck;
+        });
+        
+        console.log(`🔍 Filtered to ${filteredResults.length} results in price range $${minPrice || 0}-$${maxPrice || '∞'}`);
+        return filteredResults;
+      }
+      
+      return results;
+      
+    } catch (error) {
+      console.log(`❌ Error in searchGoogleShoppingSimple:`, error.message);
+      return [];
+    }
+  }
+
+  /**
+   * Get direct retailer URL using SERP API product API
+   */
+  async getDirectRetailerUrl(productId, targetRetailer, immersiveToken = null) {
+    try {
+      if (!this.serpApiKey) {
+        console.log('❌ No SERP API key available for direct URL extraction');
+        return null;
+      }
+
+      console.log(`🔍 Getting direct URL for product_id: ${productId} from ${targetRetailer}`);
+      
+      // If we have an immersive token, use it; otherwise try to construct one
+      if (!immersiveToken) {
+        console.log('⚠️ No immersive token provided, cannot get direct URL');
+        return null;
+      }
+      
+      const url = 'https://serpapi.com/search.json';
+      const params = {
+        engine: 'google_immersive_product',
+        page_token: immersiveToken,
+        gl: 'us',
+        hl: 'en',
+        api_key: this.serpApiKey
+      };
+      
+      console.log(`🔍 Product API request params:`, params);
+      
+      const response = await axios.get(url, { params });
+      
+      console.log(`🔍 Product API response status: ${response.status}`);
+      console.log(`🔍 Product API response keys:`, Object.keys(response.data || {}));
+      
+      if (response.data && response.data.error) {
+        console.log('❌ Product API Error:', response.data.error);
+        return null;
+      }
+      
+      if (!response.data || !response.data.product_results) {
+        console.log('⚠️ No product results found in immersive product API response');
+        console.log('🔍 Available sections:', Object.keys(response.data || {}));
+        return null;
+      }
+      
+      console.log(`🔍 Found product results in immersive API response`);
+      console.log(`🔍 Product results structure:`, JSON.stringify(response.data.product_results, null, 2));
+      
+      // The immersive product API returns different structure
+      // Look for offers or sellers in the product results
+      const productResults = response.data.product_results;
+      let directUrl = null;
+      
+      // Try to find stores with the target retailer
+      if (productResults.stores && Array.isArray(productResults.stores)) {
+        const targetStore = productResults.stores.find(store => {
+          const storeName = (store.name || '').toLowerCase();
+          const retailerName = targetRetailer.replace('.com', '').toLowerCase();
+          
+          // Check for trusted retailer patterns
+          const retailerPatterns = [
+            retailerName,
+            'walmart', 'amazon', 'target', 'best buy', 'home depot', 'lowes',
+            'costco', 'sam\'s club', 'kohl\'s', 'macy\'s', 'nordstrom',
+            'wayfair', 'staples', 'office depot', 'homedepot', 'ace hardware', 
+            'menards', 'barnes noble', 'gamestop', 'petco', 'petsmart', 
+            'dick\'s sporting goods', 'rei', 'cabela\'s', 'bass pro shops'
+          ];
+          
+          return retailerPatterns.some(pattern => storeName.includes(pattern));
+        });
+        
+        if (targetStore && targetStore.link) {
+          directUrl = targetStore.link;
+          console.log(`✅ Found direct store URL from ${targetRetailer}: ${directUrl}`);
+        }
+      }
+      
+      // Try to find offers with the target retailer
+      if (!directUrl && productResults.offers && Array.isArray(productResults.offers)) {
+        const targetOffer = productResults.offers.find(offer => {
+          const offerName = (offer.name || offer.seller || '').toLowerCase();
+          const retailerName = targetRetailer.replace('.com', '').toLowerCase();
+          
+          // Check for trusted retailer patterns
+          const retailerPatterns = [
+            retailerName,
+            'walmart', 'amazon', 'target', 'best buy', 'home depot', 'lowes',
+            'costco', 'sam\'s club', 'kohl\'s', 'macy\'s', 'nordstrom',
+            'wayfair', 'staples', 'office depot', 'homedepot', 'ace hardware', 
+            'menards', 'barnes noble', 'gamestop', 'petco', 'petsmart', 
+            'dick\'s sporting goods', 'rei', 'cabela\'s', 'bass pro shops'
+          ];
+          
+          return retailerPatterns.some(pattern => offerName.includes(pattern));
+        });
+        
+        if (targetOffer) {
+          directUrl = targetOffer.link || targetOffer.url;
+          console.log(`✅ Found offer from ${targetRetailer}: ${directUrl}`);
+        }
+      }
+      
+      // If no stores or offers found, try to extract from product link
+      if (!directUrl && productResults.link) {
+        directUrl = productResults.link;
+        console.log(`✅ Using product link: ${directUrl}`);
+      }
+      
+      if (!directUrl) {
+        console.log(`⚠️ No direct URL found for ${targetRetailer}`);
+        return null;
+      }
+      
+      console.log(`✅ Found direct URL for ${targetRetailer}: ${directUrl}`);
+      return directUrl;
+      
+    } catch (error) {
+      console.log(`⚠️ Error getting direct URL for product ${productId}:`, error.message);
+      if (error.response) {
+        console.log(`❌ Response status: ${error.response.status}`);
+        console.log(`❌ Response data:`, error.response.data);
+      }
+      return null;
+    }
+  }
+
+  /**
+   * Get anti-bot headers to bypass 412 errors
+   */
+  getAntiBotHeaders() {
+    const userAgents = [
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15'
+    ];
+    
+    const randomUserAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
+    
+    return {
+      'User-Agent': randomUserAgent,
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept-Encoding': 'gzip, deflate, br',
+      'Connection': 'keep-alive',
+      'Upgrade-Insecure-Requests': '1',
+      'Sec-Fetch-Dest': 'document',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Site': 'none',
+      'Sec-Fetch-User': '?1',
+      'Cache-Control': 'max-age=0',
+      'DNT': '1'
+    };
   }
 }
 

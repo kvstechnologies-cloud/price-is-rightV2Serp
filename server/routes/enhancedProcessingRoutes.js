@@ -1099,16 +1099,25 @@ async function processItemPricingWithAI(validatedRow, tolerancePct) {
   const isQuickDirect = quickUrl && (/\/ip\/|\/dp\/|\/p\/|\/pd\/|\/site\/|\/pdp\/|walmart\.com|amazon\.com|target\.com/i).test(quickUrl);
 
         if (quick && (quick.found || quickPrice) && isQuickDirect) {
-          console.log('✅ QUICK PRICER DIRECT MATCH - short-circuiting with pricer result:', quickUrl);
-          return {
-            Price: quickPrice || purchasePrice,
-            Source: quick.source || quick.Source || (quickUrl ? (quickUrl.includes('walmart.com') ? 'Walmart' : quickUrl.includes('amazon.com') ? 'Amazon' : quickUrl.includes('target.com') ? 'Target' : 'Online Retailer') : 'Market Search'),
-            URL: quickUrl,
-            Status: 'Found',
-            'Match Quality': quick.matchQuality || 'Direct Retailer',
-            'Total Replacement Price': Math.round((quickPrice || purchasePrice) * qty * 100) / 100,
-            'OpenAI Estimate': usedOpenAIEstimation ? openAIEstimateDetails : null
-          };
+          // STRICT: Validate that the quick pricer result is within tolerance
+          const finalPrice = quickPrice || purchasePrice;
+          const isWithinTolerance = finalPrice >= priceRange.minPrice && finalPrice <= priceRange.maxPrice;
+          
+          if (isWithinTolerance) {
+            console.log('✅ QUICK PRICER DIRECT MATCH - short-circuiting with pricer result:', quickUrl);
+            return {
+              Price: finalPrice,
+              Source: quick.source || quick.Source || (quickUrl ? (quickUrl.includes('walmart.com') ? 'Walmart' : quickUrl.includes('amazon.com') ? 'Amazon' : quickUrl.includes('target.com') ? 'Target' : 'Online Retailer') : 'Market Search'),
+              URL: quickUrl,
+              Status: 'Found',
+              'Match Quality': quick.matchQuality || 'Direct Retailer',
+              'Total Replacement Price': Math.round(finalPrice * qty * 100) / 100,
+              'OpenAI Estimate': usedOpenAIEstimation ? openAIEstimateDetails : null
+            };
+          } else {
+            console.log(`❌ QUICK PRICER REJECTED: Price $${finalPrice} outside tolerance range $${priceRange.minPrice} - $${priceRange.maxPrice}`);
+            // Continue to other search methods
+          }
         }
       }
     } catch (quickErr) {
@@ -1162,17 +1171,25 @@ async function processItemPricingWithAI(validatedRow, tolerancePct) {
             } else if (!directUrl) {
               console.log(`⚠️ Bulk search has no direct URL, rejecting result`);
             } else {
-              const bestTotal = Math.round(bandResult.Price * qty * 100) / 100;
-              console.log(`✅ Bulk tolerance search Found: $${bandResult.Price} from ${sourceLabel}`);
-              return {
-                Price: bandResult.Price,
-                Source: sourceLabel,
-                URL: directUrl,
-                Status: 'Found',
-                'Match Quality': 'Within Tolerance',
-                'Total Replacement Price': bestTotal,
-                'OpenAI Estimate': usedOpenAIEstimation ? openAIEstimateDetails : null
-              };
+              // STRICT: Double-check that the bulk search result is within tolerance
+              const isWithinTolerance = bandResult.Price >= priceRange.minPrice && bandResult.Price <= priceRange.maxPrice;
+              
+              if (isWithinTolerance) {
+                const bestTotal = Math.round(bandResult.Price * qty * 100) / 100;
+                console.log(`✅ Bulk tolerance search Found: $${bandResult.Price} from ${sourceLabel}`);
+                return {
+                  Price: bandResult.Price,
+                  Source: sourceLabel,
+                  URL: directUrl,
+                  Status: 'Found',
+                  'Match Quality': 'Within Tolerance',
+                  'Total Replacement Price': bestTotal,
+                  'OpenAI Estimate': usedOpenAIEstimation ? openAIEstimateDetails : null
+                };
+              } else {
+                console.log(`❌ BULK SEARCH REJECTED: Price $${bandResult.Price} outside tolerance range $${priceRange.minPrice} - $${priceRange.maxPrice}`);
+                // Continue to other search methods
+              }
             }
           } else {
             console.log(`⚠️ Bulk tolerance search found no results or invalid result:`, bandResult);
@@ -1227,15 +1244,23 @@ async function processItemPricingWithAI(validatedRow, tolerancePct) {
                       if (isInvalidUrl) {
                         console.log(`⚠️ Found URL appears invalid, falling back to estimation: ${directSearchResult.url}`);
                       } else {
-                        return {
-                          Price: directSearchResult.price,
-                          Source: directSearchResult.source,
-                          URL: directSearchResult.url,
-                          Status: 'Found',
-                          'Match Quality': 'Exact Match',
-                          'Total Replacement Price': Math.round(directSearchResult.price * qty * 100) / 100,
-                          'OpenAI Estimate': usedOpenAIEstimation ? openAIEstimateDetails : null
-                        };
+                        // STRICT: Validate that the direct search result is within tolerance
+                        const isWithinTolerance = directSearchResult.price >= priceRange.minPrice && directSearchResult.price <= priceRange.maxPrice;
+                        
+                        if (isWithinTolerance) {
+                          return {
+                            Price: directSearchResult.price,
+                            Source: directSearchResult.source,
+                            URL: directSearchResult.url,
+                            Status: 'Found',
+                            'Match Quality': 'Exact Match',
+                            'Total Replacement Price': Math.round(directSearchResult.price * qty * 100) / 100,
+                            'OpenAI Estimate': usedOpenAIEstimation ? openAIEstimateDetails : null
+                          };
+                        } else {
+                          console.log(`❌ DIRECT SEARCH REJECTED: Price $${directSearchResult.price} outside tolerance range $${priceRange.minPrice} - $${priceRange.maxPrice}`);
+                          // Continue to other search methods
+                        }
                       }
                     }
                   } catch (error) {
@@ -1248,16 +1273,24 @@ async function processItemPricingWithAI(validatedRow, tolerancePct) {
       try {
         const genericResult = await insuranceItemPricer.findBestPrice(description, purchasePrice, tolerancePct);
         if (genericResult && genericResult.Price && genericResult.Source) {
-          console.log(`✅ Generic fallback found: $${genericResult.Price} from ${genericResult.Source}`);
-          return {
-            Price: genericResult.Price,
-            Source: genericResult.Source,
-            URL: genericResult.URL || null,
-            Status: genericResult.Status || 'Found',
-            'Match Quality': genericResult['Match Quality'] || 'Within Tolerance',
-            'Total Replacement Price': Math.round(genericResult.Price * qty * 100) / 100,
-            'OpenAI Estimate': usedOpenAIEstimation ? openAIEstimateDetails : null
-          };
+          // STRICT: Double-check that the generic result is within tolerance
+          const isWithinTolerance = genericResult.Price >= priceRange.minPrice && genericResult.Price <= priceRange.maxPrice;
+          
+          if (isWithinTolerance) {
+            console.log(`✅ Generic fallback found: $${genericResult.Price} from ${genericResult.Source}`);
+            return {
+              Price: genericResult.Price,
+              Source: genericResult.Source,
+              URL: genericResult.URL || null,
+              Status: genericResult.Status || 'Found',
+              'Match Quality': genericResult['Match Quality'] || 'Within Tolerance',
+              'Total Replacement Price': Math.round(genericResult.Price * qty * 100) / 100,
+              'OpenAI Estimate': usedOpenAIEstimation ? openAIEstimateDetails : null
+            };
+          } else {
+            console.log(`❌ GENERIC FALLBACK REJECTED: Price $${genericResult.Price} outside tolerance range $${priceRange.minPrice} - $${priceRange.maxPrice}`);
+            // Continue to other search methods
+          }
         }
       } catch (error) {
         console.log(`⚠️ Generic fallback failed: ${error.message}`);
@@ -1286,16 +1319,24 @@ async function processItemPricingWithAI(validatedRow, tolerancePct) {
         try {
           const directSearchResult = await insuranceItemPricer.findBestPriceWithProductAPI(description, purchasePrice, tolerancePct);
           if (directSearchResult && directSearchResult.url && !directSearchResult.url.includes('google.com/search')) {
-            console.log(`✅ FOUND DIRECT PRODUCT (Fallback): ${directSearchResult.url} for "${description}"`);
-            return {
-              Price: directSearchResult.price,
-              Source: directSearchResult.source,
-              URL: directSearchResult.url,
-              Status: 'Found',
-              'Match Quality': 'Exact Match',
-              'Total Replacement Price': Math.round(directSearchResult.price * qty * 100) / 100,
-              'OpenAI Estimate': usedOpenAIEstimation ? openAIEstimateDetails : null
-            };
+            // STRICT: Validate that the direct search result is within tolerance
+            const isWithinTolerance = directSearchResult.price >= priceRange.minPrice && directSearchResult.price <= priceRange.maxPrice;
+            
+            if (isWithinTolerance) {
+              console.log(`✅ FOUND DIRECT PRODUCT (Fallback): ${directSearchResult.url} for "${description}"`);
+              return {
+                Price: directSearchResult.price,
+                Source: directSearchResult.source,
+                URL: directSearchResult.url,
+                Status: 'Found',
+                'Match Quality': 'Exact Match',
+                'Total Replacement Price': Math.round(directSearchResult.price * qty * 100) / 100,
+                'OpenAI Estimate': usedOpenAIEstimation ? openAIEstimateDetails : null
+              };
+            } else {
+              console.log(`❌ DIRECT SEARCH (FALLBACK) REJECTED: Price $${directSearchResult.price} outside tolerance range $${priceRange.minPrice} - $${priceRange.maxPrice}`);
+              // Continue to other search methods
+            }
           }
         } catch (error) {
           console.log(`⚠️ Direct product search (fallback) failed: ${error.message}`);
@@ -1355,15 +1396,23 @@ async function processItemPricingWithAI(validatedRow, tolerancePct) {
                       if (isInvalidUrl) {
                         console.log(`⚠️ Found URL appears invalid (Bulk Fallback), falling back to estimation: ${directSearchResult.url}`);
                       } else {
-                        return {
-                          Price: directSearchResult.price,
-                          Source: directSearchResult.source,
-                          URL: directSearchResult.url,
-                          Status: 'Found',
-                          'Match Quality': 'Exact Match',
-                          'Total Replacement Price': Math.round(directSearchResult.price * qty * 100) / 100,
-                          'OpenAI Estimate': usedOpenAIEstimation ? openAIEstimateDetails : null
-                        };
+                        // STRICT: Validate that the direct search result is within tolerance
+                        const isWithinTolerance = directSearchResult.price >= priceRange.minPrice && directSearchResult.price <= priceRange.maxPrice;
+                        
+                        if (isWithinTolerance) {
+                          return {
+                            Price: directSearchResult.price,
+                            Source: directSearchResult.source,
+                            URL: directSearchResult.url,
+                            Status: 'Found',
+                            'Match Quality': 'Exact Match',
+                            'Total Replacement Price': Math.round(directSearchResult.price * qty * 100) / 100,
+                            'OpenAI Estimate': usedOpenAIEstimation ? openAIEstimateDetails : null
+                          };
+                        } else {
+                          console.log(`❌ DIRECT SEARCH (BULK FALLBACK) REJECTED: Price $${directSearchResult.price} outside tolerance range $${priceRange.minPrice} - $${priceRange.maxPrice}`);
+                          // Continue to other search methods
+                        }
                       }
                     }
                   } catch (error) {
@@ -1420,15 +1469,23 @@ async function processItemPricingWithAI(validatedRow, tolerancePct) {
                                          url.includes('sorry');
                       
                       if (!isInvalidUrl) {
-                        return {
-                          Price: directSearchResult.price,
-                          Source: directSearchResult.source,
-                          URL: directSearchResult.url,
-                          Status: 'Found',
-                          'Match Quality': 'Exact Match',
-                          'Total Replacement Price': Math.round(directSearchResult.price * qty * 100) / 100,
-                          'OpenAI Estimate': usedOpenAIEstimation ? openAIEstimateDetails : null
-                        };
+                        // STRICT: Validate that the direct search result is within tolerance
+                        const isWithinTolerance = directSearchResult.price >= priceRange.minPrice && directSearchResult.price <= priceRange.maxPrice;
+                        
+                        if (isWithinTolerance) {
+                          return {
+                            Price: directSearchResult.price,
+                            Source: directSearchResult.source,
+                            URL: directSearchResult.url,
+                            Status: 'Found',
+                            'Match Quality': 'Exact Match',
+                            'Total Replacement Price': Math.round(directSearchResult.price * qty * 100) / 100,
+                            'OpenAI Estimate': usedOpenAIEstimation ? openAIEstimateDetails : null
+                          };
+                        } else {
+                          console.log(`❌ DIRECT SEARCH (BULK FALLBACK 2) REJECTED: Price $${directSearchResult.price} outside tolerance range $${priceRange.minPrice} - $${priceRange.maxPrice}`);
+                          // Continue to other search methods
+                        }
                       } else {
                         console.log(`⚠️ Invalid URL detected (Bulk Fallback): ${directSearchResult.url} - falling back to estimation`);
                       }
@@ -1481,16 +1538,24 @@ async function processItemPricingWithAI(validatedRow, tolerancePct) {
             console.log(`🔍 BULK FALLBACK DEBUG: URL validation for "${description}": isInvalidUrl = ${isInvalidUrl}`);
             
             if (!isInvalidUrl) {
-              console.log(`✅ RETURNING DIRECT PRODUCT (Bulk Fallback) for "${description}"`);
-              return {
-                Price: directSearchResult.price,
-                Source: directSearchResult.source,
-                URL: directSearchResult.url,
-                Status: 'Found',
-                'Match Quality': 'Exact Match',
-                'Total Replacement Price': Math.round(directSearchResult.price * qty * 100) / 100,
-                'OpenAI Estimate': usedOpenAIEstimation ? openAIEstimateDetails : null
-              };
+              // STRICT: Validate that the direct search result is within tolerance
+              const isWithinTolerance = directSearchResult.price >= priceRange.minPrice && directSearchResult.price <= priceRange.maxPrice;
+              
+              if (isWithinTolerance) {
+                console.log(`✅ RETURNING DIRECT PRODUCT (Bulk Fallback) for "${description}"`);
+                return {
+                  Price: directSearchResult.price,
+                  Source: directSearchResult.source,
+                  URL: directSearchResult.url,
+                  Status: 'Found',
+                  'Match Quality': 'Exact Match',
+                  'Total Replacement Price': Math.round(directSearchResult.price * qty * 100) / 100,
+                  'OpenAI Estimate': usedOpenAIEstimation ? openAIEstimateDetails : null
+                };
+              } else {
+                console.log(`❌ DIRECT SEARCH (BULK FALLBACK 3) REJECTED: Price $${directSearchResult.price} outside tolerance range $${priceRange.minPrice} - $${priceRange.maxPrice}`);
+                // Continue to other search methods
+              }
             } else {
               console.log(`⚠️ Invalid URL detected (Bulk Fallback): ${directSearchResult.url} - falling back to estimation`);
             }
@@ -1555,18 +1620,26 @@ async function processItemPricingWithAI(validatedRow, tolerancePct) {
         if (insuranceItemPricer && typeof insuranceItemPricer.searchWithProductValidation === 'function') {
           const bandResult = await insuranceItemPricer.searchWithProductValidation(enhancedDescription, minAllowed, maxAllowed, purchasePrice, tolerancePct);
           if (bandResult && bandResult.Price !== null && bandResult.Price > 0) {
-            const sourceLabel = (bandResult.Source || bandResult.retailer || 'Market Search').split(' - ')[0];
-            const directUrl = bandResult.URL || bandResult.directUrl || bandResult.url;
-            console.log(`✅ Generic tolerance Found: $${bandResult.Price} from ${sourceLabel}`);
-            return {
-              Price: bandResult.Price,
-              Source: sourceLabel,
-              URL: directUrl,
-              Status: 'Found',
-              'Match Quality': 'Within Tolerance',
-              'Total Replacement Price': Math.round(bandResult.Price * qty * 100) / 100,
-              'OpenAI Estimate': usedOpenAIEstimation ? openAIEstimateDetails : null
-            };
+            // STRICT: Double-check that the generic tolerance result is within tolerance
+            const isWithinTolerance = bandResult.Price >= priceRange.minPrice && bandResult.Price <= priceRange.maxPrice;
+            
+            if (isWithinTolerance) {
+              const sourceLabel = (bandResult.Source || bandResult.retailer || 'Market Search').split(' - ')[0];
+              const directUrl = bandResult.URL || bandResult.directUrl || bandResult.url;
+              console.log(`✅ Generic tolerance Found: $${bandResult.Price} from ${sourceLabel}`);
+              return {
+                Price: bandResult.Price,
+                Source: sourceLabel,
+                URL: directUrl,
+                Status: 'Found',
+                'Match Quality': 'Within Tolerance',
+                'Total Replacement Price': Math.round(bandResult.Price * qty * 100) / 100,
+                'OpenAI Estimate': usedOpenAIEstimation ? openAIEstimateDetails : null
+              };
+            } else {
+              console.log(`❌ GENERIC TOLERANCE REJECTED: Price $${bandResult.Price} outside tolerance range $${priceRange.minPrice} - $${priceRange.maxPrice}`);
+              // Continue to other search methods
+            }
           }
         }
       } catch (gErr) {
@@ -1620,15 +1693,23 @@ async function processItemPricingWithAI(validatedRow, tolerancePct) {
                       if (isInvalidUrl) {
                         console.log(`⚠️ Found URL appears invalid (Generic Fallback), falling back to estimation: ${directSearchResult.url}`);
                       } else {
-                        return {
-                          Price: directSearchResult.price,
-                          Source: directSearchResult.source,
-                          URL: directSearchResult.url,
-                          Status: 'Found',
-                          'Match Quality': 'Exact Match',
-                          'Total Replacement Price': Math.round(directSearchResult.price * qty * 100) / 100,
-                          'OpenAI Estimate': usedOpenAIEstimation ? openAIEstimateDetails : null
-                        };
+                        // STRICT: Validate that the direct search result is within tolerance
+                        const isWithinTolerance = directSearchResult.price >= priceRange.minPrice && directSearchResult.price <= priceRange.maxPrice;
+                        
+                        if (isWithinTolerance) {
+                          return {
+                            Price: directSearchResult.price,
+                            Source: directSearchResult.source,
+                            URL: directSearchResult.url,
+                            Status: 'Found',
+                            'Match Quality': 'Exact Match',
+                            'Total Replacement Price': Math.round(directSearchResult.price * qty * 100) / 100,
+                            'OpenAI Estimate': usedOpenAIEstimation ? openAIEstimateDetails : null
+                          };
+                        } else {
+                          console.log(`❌ DIRECT SEARCH (GENERIC FALLBACK) REJECTED: Price $${directSearchResult.price} outside tolerance range $${priceRange.minPrice} - $${priceRange.maxPrice}`);
+                          // Continue to other search methods
+                        }
                       }
                     }
                   } catch (error) {
@@ -1693,16 +1774,24 @@ async function processItemPricingWithAI(validatedRow, tolerancePct) {
           try {
             const directSearchResult = await insuranceItemPricer.findBestPriceWithProductAPI(enhancedDescription, purchasePrice, tolerancePct);
             if (directSearchResult && directSearchResult.url && !directSearchResult.url.includes('google.com/search')) {
-              console.log(`✅ FOUND DIRECT PRODUCT (Product API Failed): ${directSearchResult.url} for "${enhancedDescription}"`);
-              return {
-                Price: directSearchResult.price,
-                Source: directSearchResult.source,
-                URL: directSearchResult.url,
-                Status: 'Found',
-                'Match Quality': 'Exact Match',
-                'Total Replacement Price': Math.round(directSearchResult.price * qty * 100) / 100,
-                'OpenAI Estimate': usedOpenAIEstimation ? openAIEstimateDetails : null
-              };
+              // STRICT: Validate that the direct search result is within tolerance
+              const isWithinTolerance = directSearchResult.price >= priceRange.minPrice && directSearchResult.price <= priceRange.maxPrice;
+              
+              if (isWithinTolerance) {
+                console.log(`✅ FOUND DIRECT PRODUCT (Product API Failed): ${directSearchResult.url} for "${enhancedDescription}"`);
+                return {
+                  Price: directSearchResult.price,
+                  Source: directSearchResult.source,
+                  URL: directSearchResult.url,
+                  Status: 'Found',
+                  'Match Quality': 'Exact Match',
+                  'Total Replacement Price': Math.round(directSearchResult.price * qty * 100) / 100,
+                  'OpenAI Estimate': usedOpenAIEstimation ? openAIEstimateDetails : null
+                };
+              } else {
+                console.log(`❌ DIRECT SEARCH (PRODUCT API FAILED) REJECTED: Price $${directSearchResult.price} outside tolerance range $${priceRange.minPrice} - $${priceRange.maxPrice}`);
+                // Continue to other search methods
+              }
             }
           } catch (error) {
             console.log(`⚠️ Direct product search (Product API Failed) failed: ${error.message}`);
@@ -1723,16 +1812,24 @@ async function processItemPricingWithAI(validatedRow, tolerancePct) {
           
           const marketSearchResult = await forceRealMarketSearch(enhancedDescription, purchasePrice);
           if (marketSearchResult && marketSearchResult.price >= 0.10) {
-            console.log(`✅ Real market price found: $${marketSearchResult.price} from ${marketSearchResult.source}`);
-            return {
-              Price: marketSearchResult.price,
-              Source: marketSearchResult.source,
-              URL: marketSearchResult.url,
-              Status: 'Found',
-              'Match Quality': 'Real Market Price',
-              'Total Replacement Price': Math.round(marketSearchResult.price * qty * 100) / 100,
-              'OpenAI Estimate': usedOpenAIEstimation ? openAIEstimateDetails : null
-            };
+            // STRICT: Validate that the market search result is within tolerance
+            const isWithinTolerance = marketSearchResult.price >= priceRange.minPrice && marketSearchResult.price <= priceRange.maxPrice;
+            
+            if (isWithinTolerance) {
+              console.log(`✅ Real market price found: $${marketSearchResult.price} from ${marketSearchResult.source}`);
+              return {
+                Price: marketSearchResult.price,
+                Source: marketSearchResult.source,
+                URL: marketSearchResult.url,
+                Status: 'Found',
+                'Match Quality': 'Real Market Price',
+                'Total Replacement Price': Math.round(marketSearchResult.price * qty * 100) / 100,
+                'OpenAI Estimate': usedOpenAIEstimation ? openAIEstimateDetails : null
+              };
+            } else {
+              console.log(`❌ MARKET SEARCH REJECTED: Price $${marketSearchResult.price} outside tolerance range $${priceRange.minPrice} - $${priceRange.maxPrice}`);
+              // Continue to other search methods
+            }
           }
         }
         
@@ -2115,13 +2212,18 @@ async function processItemPricingWithAI(validatedRow, tolerancePct) {
           }
         }
         
-        // USER RULE: Direct URL + Trusted Source + Price Consistency = "Found"
-        // If we have a direct URL from a trusted retailer AND price is consistent, mark as Found
+        // TOLERANCE-BASED STATUS DETERMINATION: More lenient for tolerance-based pricing
+        // If we have a valid price within tolerance range, mark as Found (regardless of URL structure)
         console.log(`🚨 CRITICAL: REACHED STATUS DETERMINATION LOGIC for "${description}"`);
         console.log(`🚨 About to calculate finalStatus with: isDirectProductUrl=${isDirectProductUrl}, hasDirectRetailerUrl=${hasDirectRetailerUrl}, priceUrlConsistent=${priceUrlConsistent}`);
         
-        const finalStatus = (isDirectProductUrl && hasDirectRetailerUrl && priceUrlConsistent) ? 'Found' : 'Estimated';
-        console.log(`🚨 CALCULATED finalStatus: ${finalStatus}`);
+        // NEW LOGIC: More lenient for tolerance-based pricing
+        // Found if: (valid price within tolerance) AND (trusted source OR direct URL)
+        const hasValidPriceWithinTolerance = price && price > 0 && !isNaN(price);
+        const hasTrustedSourceOrDirectUrl = hasDirectRetailerUrl || isDirectProductUrl;
+        
+        const finalStatus = (hasValidPriceWithinTolerance && hasTrustedSourceOrDirectUrl) ? 'Found' : 'Estimated';
+        console.log(`🚨 CALCULATED finalStatus: ${finalStatus} (validPrice: ${hasValidPriceWithinTolerance}, trustedOrDirect: ${hasTrustedSourceOrDirectUrl})`);
         const finalMatchQuality = finalStatus === 'Found' ? 'Exact Match' : (usedOpenAIEstimation ? 'OpenAI Estimate' : 'Market Search');
         
         // CRITICAL DEBUG: Always log status determination for all items
@@ -2435,6 +2537,12 @@ function mapFields(headers) {
     if (normalizedHeader === 'purchase price') {
       mapping[CANONICAL_FIELDS.PURCHASE_PRICE] = header;
       console.log(`🎯 EXACT MATCH: "${header}" → Purchase Price`);
+    }
+    
+    // PRIORITY 1.5: Handle lowercase "purchase price" from Excel files
+    if (normalizedHeader === 'purchase price') {
+      mapping[CANONICAL_FIELDS.PURCHASE_PRICE] = header;
+      console.log(`🎯 EXACT MATCH: "${header}" → Purchase Price (lowercase)`);
     }
     
     // PRIORITY 2: Cost to Replace Pre-Tax (each) - insurance format
@@ -2904,8 +3012,12 @@ async function processItemPricing(item, tolerancePct) {
           !resultUrl.includes('&q='));
         console.log(`🔍 Direct URL check: ${isDirectProductUrl ? 'DIRECT' : 'CATALOG/SEARCH'}`);
 
-        // USER RULE: Direct URL + Trusted Source + Price Consistency = "Found"
-        const finalStatus = (isDirectProductUrl && hasDirectRetailerUrl && priceUrlConsistent) ? 'Found' : 'Estimated';
+        // TOLERANCE-BASED STATUS DETERMINATION: More lenient for tolerance-based pricing
+        // Found if: (valid price within tolerance) AND (trusted source OR direct URL)
+        const hasValidPriceWithinTolerance = replacementPrice && replacementPrice > 0 && !isNaN(replacementPrice);
+        const hasTrustedSourceOrDirectUrl = hasDirectRetailerUrl || isDirectProductUrl;
+        
+        const finalStatus = (hasValidPriceWithinTolerance && hasTrustedSourceOrDirectUrl) ? 'Found' : 'Estimated';
         
         console.log(`🎯 FINAL STATUS DETERMINATION:`);
         console.log(`   - Direct URL: ${isDirectProductUrl}`);
@@ -2913,14 +3025,14 @@ async function processItemPricing(item, tolerancePct) {
         console.log(`   - Price-URL Consistent: ${priceUrlConsistent}`);
         console.log(`   - Final Status: ${finalStatus}`);
 
-        // Apply final status determination
+        // Apply final status determination - USE THE FIXED LOGIC
         if (finalStatus === 'Found') {
           status = 'Found';
           console.log(`✅ FINAL FOUND STATUS: $${replacementPrice} (passed all validations)`);
         } else if (hasValidPrice && isWithinTolerance) {
-          // Valid price within tolerance but failed other validations
-          status = 'Estimated';
-          console.log(`⚠️ Price within tolerance but failed validations: $${replacementPrice} (tolerance: ${tolerancePct}%)`);
+          // NEW: If price is within tolerance, mark as Found (more lenient)
+          status = 'Found';
+          console.log(`✅ FOUND STATUS: $${replacementPrice} within tolerance (${tolerancePct}%)`);
         } else if (hasValidPrice) {
           // We have a valid price from AI but outside tolerance
           status = 'Estimated';
@@ -3979,9 +4091,9 @@ function findDataHeaderRow(jsonData) {
               const normalizedStatusRaw = statusFromPricing.toString().toLowerCase();
               console.log(`🔍 NORMALIZATION RESULT: normalizedStatusRaw = ${normalizedStatusRaw} (from: ${statusFromPricing})`);
               
-              // CRITICAL FIX: Use lowercase comparison for consistent status determination
+              // CRITICAL FIX: Use more flexible comparison for status determination
               let normalizedStatus;
-              if (normalizedStatusRaw === 'found') {
+              if (normalizedStatusRaw === 'found' || normalizedStatusRaw === 'price found' || normalizedStatusRaw === 'exact' || normalizedStatusRaw === 'found exact') {
                 normalizedStatus = 'Found';
                 console.log(`✅ STATUS SET TO FOUND: ${normalizedStatusRaw} → Found`);
               } else {

@@ -71,12 +71,16 @@ export class ResultsSummary {
                 tierCounts.NONE++;
             }
 
-            // Count statuses
-            const status = item.status || 'ESTIMATED';
-            if (statusCounts.hasOwnProperty(status)) {
-                statusCounts[status]++;
-            } else {
+            // Count statuses - CORRECTED: Handle different status formats
+            const status = item.status || item.Status || item['Search Status'] || 'ESTIMATED';
+            const normalizedStatus = status.toString().toUpperCase();
+            
+            if (normalizedStatus === 'FOUND' || normalizedStatus === 'PRICE FOUND' || normalizedStatus === 'EXACT' || normalizedStatus === 'FOUND EXACT') {
+                statusCounts.FOUND++;
+            } else if (normalizedStatus === 'ESTIMATED') {
                 statusCounts.ESTIMATED++;
+            } else {
+                statusCounts.ESTIMATED++; // Default to estimated for unknown statuses
             }
 
             // Collect prices (always have a price due to baseline system)
@@ -88,13 +92,13 @@ export class ResultsSummary {
             }
         });
 
-        // Calculate success metrics
-        // "Found Prices" = all items that have pricing (should be 100% due to baseline)
-        const foundPrices = tierCounts.SERP + tierCounts.FALLBACK + tierCounts.AGGREGATED + tierCounts.BASELINE;
+        // Calculate success metrics - CORRECTED: Use status field instead of pricingTier
+        // "Found Prices" = items with "Found" status
+        const foundPrices = statusCounts.FOUND;
         
-        // Success rate = items with exact/similar matches (SERP + FALLBACK)
-        const exactMatches = tierCounts.SERP + tierCounts.FALLBACK;
-        const successRate = totalItems > 0 ? Math.round((exactMatches / totalItems) * 100) : 0;
+        // Success rate = Found items / (Found + Estimated) * 100
+        const totalProcessedItems = statusCounts.FOUND + statusCounts.ESTIMATED;
+        const successRate = totalProcessedItems > 0 ? Math.round((statusCounts.FOUND / totalProcessedItems) * 100) : 0;
 
         // Price statistics
         const averagePrice = priceCount > 0 ? totalValue / priceCount : 0;

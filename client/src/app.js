@@ -1126,15 +1126,21 @@ class InsurancePricingApp {
             return;
         }
 
-        // FIXED: Calculate success rate as Total Found Status / Total Records * 100
+        // CORRECTED: Calculate success rate as Found items / (Found + Estimated) * 100
         const totalItems = items.length;
         const foundItems = items.filter(item => {
             const status = item['Search Status'] || item.Status || item.status;
             const s = (status || '').toString().toLowerCase();
             return s === 'found' || s === 'price found' || s === 'exact' || s === 'found exact';
         }).length;
-        // FIXED: Success rate = Found items / Total items * 100 (not Found/(Found+Estimated))
-        const successRate = totalItems > 0 ? Math.round((foundItems / totalItems) * 100) : 0;
+        const estimatedItems = items.filter(item => {
+            const status = item['Search Status'] || item.Status || item.status;
+            return (status || '').toString().toLowerCase() === 'estimated';
+        }).length;
+        
+        // CORRECTED: Success rate = Found items / (Found + Estimated) * 100
+        const totalProcessedItems = foundItems + estimatedItems;
+        const successRate = totalProcessedItems > 0 ? Math.round((foundItems / totalProcessedItems) * 100) : 0;
 
         // Create summary message
         let summaryHtml = `
@@ -1711,7 +1717,7 @@ class InsurancePricingApp {
         
         console.log('🔍 Frontend Debug: results-content found, proceeding with render');
 
-        // Calculate statistics (Found-based success rate)
+        // Calculate statistics - CORRECTED: Only count actual "Found" status
         const totalItems = items.length;
         const foundItems = items.filter(item => {
             const status = item['Search Status'] || item.Status || item.status;
@@ -1722,8 +1728,10 @@ class InsurancePricingApp {
             const status = item['Search Status'] || item.Status || item.status;
             return (status || '').toString().toLowerCase() === 'estimated';
         }).length;
-        const denom = foundItems + estimatedItems;
-        const successRate = denom > 0 ? Math.round((foundItems / denom) * 100) : 0;
+        
+        // CORRECTED: Success rate = Found items / (Found + Estimated) * 100
+        const totalProcessedItems = foundItems + estimatedItems;
+        const successRate = totalProcessedItems > 0 ? Math.round((foundItems / totalProcessedItems) * 100) : 0;
 
         // Calculate pagination
         const totalPages = Math.ceil(totalItems / itemsPerPage);
