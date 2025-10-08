@@ -2939,16 +2939,12 @@ class InsuranceItemPricer {
         ValidationErrors: ['No price range available for strict validation']
       };
     }
-    const stretchUpperFraction = 0.35; // +35% stretch if no in-band verified match
-    const stretchMaxPrice = hasTarget ? targetPrice * (1 + stretchUpperFraction) : maxPriceBand;
-
     if (this.debugMode) {
       console.log(`🎯 PRICE TOLERANCE ANALYSIS:`);
       console.log(`   Target Price: $${targetPrice}`);
       console.log(`   Tolerance: ${toleranceFraction * 100}%`);
       console.log(`   Min Price: $${minPriceBand}`);
       console.log(`   Max Price: $${maxPriceBand}`);
-      console.log(`   Stretch Max: $${stretchMaxPrice}`);
     }
 
     // Optional guardrail: if query is generic (very few words, no digits),
@@ -3071,7 +3067,6 @@ class InsuranceItemPricer {
     
     // Check if price is within tolerance
     const isWithinTolerance = hasTarget ? (bestMatch.price >= minPriceBand && bestMatch.price <= maxPriceBand) : true;
-    const isWithinStretch = hasTarget ? (!isWithinTolerance && bestMatch.price > maxPriceBand && bestMatch.price <= stretchMaxPrice) : false;
     
     // FIXED: Status determination prioritizes direct URLs and trusted sources
     let status, explanation;

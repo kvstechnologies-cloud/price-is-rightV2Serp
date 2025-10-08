@@ -3,7 +3,7 @@ class ChatGPTInterface {
     constructor(container) {
         this.container = container;
         this.selectedFiles = [];
-        this.currentTolerance = '50';
+        this.currentTolerance = '10';
         
         // Generate a unique instance ID for debugging
         this._instanceId = 'chatgpt_' + Math.random().toString(36).substr(2, 9);
